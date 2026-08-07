@@ -1,0 +1,30 @@
+# LaTeX build artefacts
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.bbl
+*.blg
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# experiment outputs (regenerate by running the suite)
+results_v2.json
+results_smoke.json
+warmstart_concat.pt
+data_cache_*.pkl
+paper_assets/
+paper_assets.zip
+
+# never commit these
+*.pem
+*.key
+.env
+credentials*.json
+kaggle.json
