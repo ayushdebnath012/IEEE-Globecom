@@ -1,12 +1,19 @@
 # =============================================================================
-# OmniMed-FL - reviewer experiment suite, single-file Colab build
+# OmniMed-FL - reviewer experiment suite, single-file KAGGLE build
 # =============================================================================
-# Paste this whole file into ONE Colab cell and run it.
+# Paste this whole file into ONE Kaggle notebook cell and run it.
 #
-#   Runtime -> Change runtime type -> T4 GPU   (do this first)
+# Before running, in the right-hand panel:
+#   Settings -> Accelerator -> GPU T4 x2  (or P100)
+#   Settings -> Internet    -> On         (needed for HuggingFace + GitHub)
 #
-# It will ask you to upload MedFederate_Colab_Complete.py the first time.
-# Everything else is contained here.
+# No uploads. The training module is fetched from
+#   github.com/ayushdebnath012/IEEE-Globecom
+#
+# Kaggle beats Colab here in two ways:
+#   - /kaggle/working persists for the whole session and is saved with the
+#     notebook version, so results survive without downloading after every step
+#   - sessions run up to 9 h, long enough for the full sweep in one go
 #
 # What runs, and which reviewer point it answers:
 #   E1 Dirichlet alpha sweep .................. R3.1
@@ -17,15 +24,12 @@
 #   E6 measured runtime / memory / comm ....... R1.2, R3.4
 #   E7 retrieval over the held-out split ...... R3.2
 #   E8 FedAvg/FedProx/SCAFFOLD/FedBN/local .... R3.3
-#
-# IMPORTANT: /content is wiped when the session ends. This script downloads
-# results_v2.json to your computer after every chunk automatically. Keep the
-# newest one - it accumulates everything and is what lets you resume.
 # =============================================================================
 
 from __future__ import annotations
 
 import argparse, copy, gc, importlib.util, json, os, pickle, random, re, sys, time
+import urllib.request
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -37,10 +41,20 @@ try:
     import torch.nn as nn
     from torch.utils.data import DataLoader, Subset
 except ImportError:
-    raise SystemExit("PyTorch missing. On Colab it is preinstalled - check the runtime.")
+    raise SystemExit("PyTorch missing - check the Kaggle accelerator setting.")
 
-IN_NOTEBOOK = "google.colab" in sys.modules or "ipykernel" in sys.modules
-CONTENT = Path("/content") if Path("/content").exists() else Path(".")
+# Kaggle always sets these; a bare path check false-positives on machines
+# that happen to have a C:\kaggle or /kaggle directory lying around.
+ON_KAGGLE = bool(os.environ.get("KAGGLE_KERNEL_RUN_TYPE")
+                 or os.environ.get("KAGGLE_URL_BASE")) or (
+    os.name != "nt" and Path("/kaggle/working").exists()
+    and Path("/kaggle/input").exists())
+WORK = Path("/kaggle/working") if ON_KAGGLE else Path(".")
+IN_NOTEBOOK = ON_KAGGLE or "ipykernel" in sys.modules
+
+BASE_NAME = "MedFederate_Colab_Complete.py"
+BASE_URL = ("https://raw.githubusercontent.com/ayushdebnath012/"
+            "IEEE-Globecom/main/source/" + BASE_NAME)
 
 # =============================================================================
 # Pretrained-encoder fix  (do not remove)
@@ -1562,135 +1576,116 @@ def _tables_main():
 
 
 # =============================================================================
-# Colab driver
+# Kaggle driver
 # =============================================================================
-
-BASE_NAME = "MedFederate_Colab_Complete.py"
 
 
 def _ensure_base() -> str:
-    """Locate MedFederate_Colab_Complete.py, prompting for upload if absent."""
-    for cand in (CONTENT / BASE_NAME, Path.cwd() / BASE_NAME):
-        if cand.exists():
-            return str(cand)
-    if not IN_NOTEBOOK:
-        raise FileNotFoundError(f"{BASE_NAME} not found; put it beside this script.")
-    print(f"{BASE_NAME} not found. Select it from your computer")
-    print("(it is in Globecom_final/experiments/):")
-    from google.colab import files
-    import shutil
-    for name in files.upload():
-        shutil.move(name, str(CONTENT / name))
-    p = CONTENT / BASE_NAME
-    if not p.exists():
-        raise FileNotFoundError(f"{BASE_NAME} still missing - rerun and pick the right file.")
-    return str(p)
+    """Find the training module, or fetch it from GitHub. No manual upload."""
+    # a Kaggle Dataset attached to the notebook
+    for root in Path("/kaggle/input").glob("*") if Path("/kaggle/input").exists() else []:
+        c = root / BASE_NAME
+        if c.exists():
+            print(f"  base module from attached dataset: {c}")
+            return str(c)
+    local = WORK / BASE_NAME
+    if local.exists():
+        print(f"  base module already present: {local}")
+        return str(local)
+    print(f"  fetching {BASE_NAME} from GitHub ...")
+    try:
+        urllib.request.urlretrieve(BASE_URL, str(local))
+    except Exception as e:
+        raise SystemExit(
+            f"Could not download the training module ({e}).\n"
+            f"Turn Internet ON in the Settings panel, or attach it as a Dataset.")
+    print(f"  saved to {local} ({local.stat().st_size/1024:.0f} KB)")
+    return str(local)
 
 
 def _ensure_faiss():
     try:
         import faiss  # noqa
     except ImportError:
-        print("installing faiss-cpu (needed by E7)...")
+        print("  installing faiss-cpu (needed by E7) ...")
         os.system(f"{sys.executable} -m pip install -q faiss-cpu")
 
 
-def _download(paths):
-    if not IN_NOTEBOOK:
-        return
-    try:
-        from google.colab import files
-    except ImportError:
-        return
-    for p in paths:
-        if Path(p).exists():
-            print(f"  downloading {Path(p).name} ({Path(p).stat().st_size/1e6:.1f} MB)")
-            try:
-                files.download(str(p))
-            except Exception as e:
-                print(f"  (download failed: {e} - grab it from the Files pane)")
-
-
-def restore():
-    """Upload a results_v2.json (and warmstart_concat.pt) saved from an earlier
-    session, so this one resumes instead of starting over."""
-    if not IN_NOTEBOOK:
-        print("not in a notebook; nothing to restore")
-        return
-    from google.colab import files
-    import shutil
-    print("Select results_v2.json (and warmstart_concat.pt if you have it):")
-    for name in files.upload():
-        shutil.move(name, str(CONTENT / name))
-        print("  restored", name)
-
-
-def run(tier="smoke", only=None, out=None, download=True):
+def run(tier="smoke", only=None, out=None, verify=True):
     """Run a chunk.
 
-        run("smoke")                      ~20 min, validates everything
-        run("standard", ["E1","E2"])      alpha + client sweeps
-        run("standard", ["E3","E4"])      ablations
-        run("standard", ["E8"])           matched baselines
-        run("standard", ["E5","E6","E7"]) variance, cost, retrieval
+        run("smoke")                        ~20 min, validates everything
+        run("standard", ["E1","E2"])        alpha + client sweeps
+        run("standard", ["E3","E4"])        ablations
+        run("standard", ["E8"])             matched baselines
+        run("standard", ["E5","E6","E7"])   variance, cost, retrieval
+        run("standard")                     everything in one session
     """
     base = _ensure_base()
     _ensure_faiss()
     _patch_transformers()
-    out = out or str(CONTENT / ("results_smoke.json" if tier == "smoke" else "results_v2.json"))
+
+    if verify:
+        mf = load_base(base)
+        want_text = TIERS[tier]["text_model"]
+        if not verify_encoders(mf, [want_text]):
+            raise SystemExit(
+                "\nStopping: the text encoder is not loading pretrained weights, so\n"
+                "these results would be meaningless. Fix that before running.")
+
+    out = out or str(WORK / ("results_smoke.json" if tier == "smoke" else "results_v2.json"))
     main(base_py=base, tier=tier, out=out, only=only)
-    if download:
-        print("\nSaving your only copy of the results:")
-        _download([out, str(Path(out).parent / "warmstart_concat.pt")])
+    print(f"\n  results at {out}")
+    print("  /kaggle/working persists for this session; Save Version to keep it.")
     return out
 
 
 def build_tables(results=None, outdir=None):
-    """Turn the results into LaTeX tables, figures and SUMMARY.md, then zip them."""
-    results = results or str(CONTENT / "results_v2.json")
-    outdir = outdir or str(CONTENT / "paper_assets")
+    """Turn the results into LaTeX tables, figures and SUMMARY.md."""
+    results = results or str(WORK / "results_v2.json")
+    outdir = outdir or str(WORK / "paper_assets")
     if not Path(results).exists():
-        raise FileNotFoundError(f"{results} not found - run the chunks first, "
-                                f"or call restore() to upload a saved one.")
+        raise FileNotFoundError(f"{results} not found - run the chunks first.")
     sys.argv = ["omnimed", "--results", results, "--outdir", outdir]
     _tables_main()
     print("\n" + "=" * 70)
-    summary = Path(outdir) / "SUMMARY.md"
-    if summary.exists():
-        print(summary.read_text(encoding="utf8"))
+    s = Path(outdir) / "SUMMARY.md"
+    if s.exists():
+        print(s.read_text(encoding="utf8"))
     import shutil as _sh
-    zp = str(CONTENT / "paper_assets")
-    _sh.make_archive(zp, "zip", outdir)
-    _download([zp + ".zip"])
+    _sh.make_archive(str(WORK / "paper_assets"), "zip", outdir)
+    print(f"\n  zipped -> {WORK}/paper_assets.zip")
+    print("  Save Version, then grab it from the notebook's Output tab.")
     return outdir
 
 
 def full_run():
-    """Every chunk in order, downloading after each. Use only if you are on a
-    paid runtime that will not drop; otherwise run the chunks one at a time."""
+    """Every chunk in order. Kaggle sessions are long enough to attempt this."""
     for only in (["E1", "E2"], ["E3", "E4"], ["E8"], ["E5", "E6", "E7"]):
         print("\n" + "#" * 70)
         print("# CHUNK", only)
         print("#" * 70)
-        run("standard", only)
+        run("standard", only, verify=False)
     build_tables()
 
 
-def _gpu_check():
-    if not torch.cuda.is_available():
-        print("!! NO GPU. Runtime -> Change runtime type -> T4 GPU, then rerun.")
-        return False
-    print("GPU:", torch.cuda.get_device_name(0), "| torch", torch.__version__)
-    return True
-
-
-if IN_NOTEBOOK:
+def _banner():
     print("=" * 70)
-    print("OmniMed-FL experiment suite loaded")
+    print("OmniMed-FL experiment suite - Kaggle build")
     print("=" * 70)
-    _gpu_check()
+    if torch.cuda.is_available():
+        print("GPU:", torch.cuda.get_device_name(0), "| torch", torch.__version__)
+    else:
+        print("!! NO GPU. Settings -> Accelerator -> GPU, then rerun this cell.")
+    if ON_KAGGLE:
+        print("working dir:", WORK, "(persists for the session)")
+    try:
+        urllib.request.urlopen("https://raw.githubusercontent.com", timeout=5)
+        print("internet: on")
+    except Exception:
+        print("!! internet appears OFF - Settings -> Internet -> On")
     print("""
-Run these one at a time, in this order:
+Run these one at a time:
 
     run("smoke")                        # ~20 min  - do this first
     run("standard", ["E1","E2"])        # ~2-3 h   - alpha + client sweeps
@@ -1699,6 +1694,12 @@ Run these one at a time, in this order:
     run("standard", ["E5","E6","E7"])   # ~1-2 h   - variance, cost, retrieval
     build_tables()                      # LaTeX tables + SUMMARY.md
 
-Each run() downloads results_v2.json when it finishes - keep the newest.
-Disconnected? Re-paste this cell, call restore(), then repeat the chunk.
+or  full_run()   to attempt all of it in one session.
+
+Results stay in /kaggle/working. Click Save Version before the session ends,
+or they are lost. Finished work is skipped if you re-run a chunk.
 """)
+
+
+if IN_NOTEBOOK:
+    _banner()
