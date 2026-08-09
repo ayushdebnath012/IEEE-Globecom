@@ -1141,8 +1141,13 @@ def run_rag_eval(mf, data, cfg, device, tokenizer, top_k: int = 5):
 
 
 def main(base_py: str, tier: str = "standard", out: str = "results_v2.json",
-         cache: Optional[str] = None, only=None):
-    t = TIERS[tier]
+         cache: Optional[str] = None, only=None, seeds=None, alphas=None):
+    t = dict(TIERS[tier])  # copy, so overrides do not mutate the module table
+    if seeds:
+        t["seeds"] = list(seeds)
+        t["fusion_seeds"] = list(seeds)
+    if alphas:
+        t["alphas"] = list(alphas)
     print("=" * 68)
     print(f"OmniMed-FL experiment suite | tier={tier}")
     print("=" * 68)
@@ -1206,6 +1211,13 @@ if __name__ == "__main__":
     ap.add_argument("--cache", default=None)
     ap.add_argument("--only", default=None,
                     help="comma-separated subset, e.g. E1,E8")
+    ap.add_argument("--seeds", default=None,
+                    help="override tier seeds, e.g. 0,1,2. Completed keys are "
+                         "skipped, so this fills in only the new seeds.")
+    ap.add_argument("--alphas", default=None,
+                    help="override tier alphas, e.g. 0.05,0.1,1.0")
     a = ap.parse_args()
     main(a.base, a.tier, a.out, a.cache,
-         only=[x.strip() for x in a.only.split(',')] if a.only else None)
+         only=[x.strip() for x in a.only.split(',')] if a.only else None,
+         seeds=[int(x) for x in a.seeds.split(',')] if a.seeds else None,
+         alphas=[float(x) for x in a.alphas.split(',')] if a.alphas else None)
