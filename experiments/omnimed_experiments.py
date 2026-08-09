@@ -91,6 +91,62 @@ FUSION_TYPES = ["concat", "attention", "gated", "clip",
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Pretrained-encoder fix (do not remove)
+# ---------------------------------------------------------------------------
+# LightweightTextClassifier loads its encoder with AutoModel inside a bare
+# try/except. Current transformers rejects prajjwal1/bert-* (no "model_type"
+# in config.json), the except fires, and the encoder silently becomes a
+# RANDOMLY INITIALISED embedding + 2-layer transformer. Training then reports
+# numbers containing no pretrained language model at all.
+
+
+def _patch_transformers():
+    """Route configs/models that Auto* rejects to the BERT classes explicitly."""
+    try:
+        from transformers import AutoConfig, AutoModel, BertConfig, BertModel
+    except ImportError:
+        return False
+    if getattr(AutoConfig, "_omnimed_patched", False):
+        return True
+    _oc, _om = AutoConfig.from_pretrained, AutoModel.from_pretrained
+
+    def cfg(name, *a, **k):
+        try:
+            return _oc(name, *a, **k)
+        except Exception:
+            return BertConfig.from_pretrained(name, *a, **k)
+
+    def mdl(name, *a, **k):
+        try:
+            return _om(name, *a, **k)
+        except Exception:
+            return BertModel.from_pretrained(name, *a, **k)
+
+    AutoConfig.from_pretrained = cfg
+    AutoModel.from_pretrained = mdl
+    AutoConfig._omnimed_patched = True
+    print("  [patch] transformers Auto* fallback installed")
+    return True
+
+
+def verify_encoders(mf, names):
+    """Fail loudly if an encoder is not loading pretrained weights."""
+    print("  verifying text encoders load pretrained weights:")
+    bad = []
+    for n in names:
+        try:
+            m = mf.LightweightTextClassifier(n, 5)
+            ok = m.transformer is not None
+            print(f"    {'OK      ' if ok else 'FALLBACK'}  {n}")
+            if not ok:
+                bad.append(n)
+            del m
+        except Exception as e:
+            print(f"    ERROR     {n}  ({str(e)[:60]})")
+            bad.append(n)
+    return not bad
+
 def load_base(base_py: str):
     """Import MedFederate_Colab_Complete.py without firing its __main__ block."""
     base_py = str(base_py)
@@ -957,7 +1013,12 @@ def main(base_py: str, tier: str = "standard", out: str = "results_v2.json",
     print(f"OmniMed-FL experiment suite | tier={tier}")
     print("=" * 68)
 
+    _patch_transformers()
     mf = load_base(base_py)
+    if not verify_encoders(mf, [t["text_model"]]):
+        raise SystemExit(
+            "\nStopping: the text encoder is not loading pretrained weights, "
+            "so these results would be meaningless. Fix that before running.")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if device.type != "cuda":
         print("\n!! No GPU detected. Runtime -> Change runtime type -> GPU.")
