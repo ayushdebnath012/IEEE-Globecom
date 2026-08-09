@@ -267,9 +267,14 @@ def _patch_image_loader(mf):
             print(f"  Loaded {len(images)} REAL images: {dict(counts)}")
             return images, labels
         except Exception as e:
-            print(f"  HF load failed ({e}). Using synthetic X-ray fallback.")
-            return mf.generate_synthetic_image_data(
-                n_per_class * len(mf.CONDITION_LABELS), img_size)
+            # Return EMPTY, not synthetic. The original substituted a full
+            # synthetic set here, which both hid the failure and pushed the
+            # caller's running total past its break threshold -- so a dead
+            # source silently prevented every later source from being tried.
+            # load_medical_image_data() already tops up per class at the end,
+            # which is where synthetic filling belongs.
+            print(f"  source unavailable ({str(e)[:80]}) -- skipping, no synthetic substitution")
+            return [], []
 
     mf.load_hf_medical_images = load_hf_medical_images
     print("  [patch] image loader (ClassLabel resolution) installed")
