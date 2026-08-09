@@ -147,6 +147,47 @@ def verify_encoders(mf, names):
             bad.append(n)
     return not bad
 
+def _patch_datasets():
+    """Supply the config names load_hf_medical_images() never passes.
+
+    load_dataset("keremberke/chest-xray-classification", split="train") raises
+    "Config name is missing" because that dataset defines configs full/mini.
+    The caller wraps the load in a bare except, so the error is swallowed and
+    every image silently becomes a synthetic surrogate. Same for the NIH set.
+    Patched here rather than in the base module so the original stays intact.
+    """
+    try:
+        import datasets
+    except ImportError:
+        return False
+    if getattr(datasets, "_omnimed_patched", False):
+        return True
+
+    CONFIGS = {
+        "keremberke/chest-xray-classification": "full",
+        "alkzar90/NIH-Chest-X-ray-dataset": "image-classification",
+    }
+    _orig = datasets.load_dataset
+
+    def load_dataset(path, name=None, *a, **k):
+        if name is None and path in CONFIGS:
+            name = CONFIGS[path]
+        k.setdefault("trust_remote_code", True)
+        return _orig(path, name, *a, **k)
+
+    datasets.load_dataset = load_dataset
+    datasets._omnimed_patched = True
+    print("  [patch] dataset config names installed")
+    return True
+
+
+def verify_images(mf, n=5):
+    """Report whether real radiographs loaded, or synthetic surrogates."""
+    imgs, labels = mf.load_medical_image_data(n_per_class=n, img_size=224)
+    print(f"  image check: {len(imgs)} images loaded")
+    return len(imgs) > 0
+
+
 def load_base(base_py: str):
     """Import MedFederate_Colab_Complete.py without firing its __main__ block."""
     base_py = str(base_py)
@@ -1014,6 +1055,7 @@ def main(base_py: str, tier: str = "standard", out: str = "results_v2.json",
     print("=" * 68)
 
     _patch_transformers()
+    _patch_datasets()
     mf = load_base(base_py)
     if not verify_encoders(mf, [t["text_model"]]):
         raise SystemExit(
