@@ -188,6 +188,94 @@ def verify_images(mf, n=5):
     return len(imgs) > 0
 
 
+def _patch_image_loader(mf):
+    """Replace load_hf_medical_images with a version that resolves ClassLabels.
+
+    Third defect in the same call path. condition_mapping is keyed on label
+    NAMES ('NORMAL', 'PNEUMONIA'), but the loader compares against
+    str(item[label_col]) and these datasets store labels as ClassLabel
+    integers. So str(0) == '0' never matches 'NORMAL', every row is skipped,
+    the function returns 0 images, and the caller quietly tops the class up
+    with synthetic surrogates. Net effect: an all-synthetic image set that
+    reports no error anywhere.
+    """
+    def load_hf_medical_images(dataset_name, condition_mapping,
+                               n_per_class=200, img_size=224):
+        from collections import defaultdict
+        try:
+            from datasets import load_dataset
+            from PIL import Image as PILImage
+            import torchvision.transforms as T
+
+            transform = T.Compose([
+                T.Resize((img_size, img_size)), T.ToTensor(),
+                T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+
+            print(f"  Loading {dataset_name} ...")
+            ds = load_dataset(dataset_name, split="train")
+
+            label_col = next((c for c in ["label", "labels", "condition", "finding",
+                                          "diagnosis", "class"]
+                              if c in ds.column_names), None)
+            img_col = next((c for c in ["image", "img", "pixel_values", "photo"]
+                            if c in ds.column_names), None)
+            if label_col is None or img_col is None:
+                raise ValueError("Missing label or image column")
+
+            # ClassLabel -> names, so integer labels can be resolved
+            names = None
+            feat = ds.features.get(label_col)
+            if hasattr(feat, "names"):
+                names = list(feat.names)
+            elif hasattr(feat, "feature") and hasattr(feat.feature, "names"):
+                names = list(feat.feature.names)
+
+            lut = {str(k).lower(): v for k, v in condition_mapping.items()}
+
+            def resolve(raw):
+                vals = raw if isinstance(raw, (list, tuple)) else [raw]
+                for v in vals:
+                    if names is not None and isinstance(v, int) and 0 <= v < len(names):
+                        v = names[v]
+                    tgt = lut.get(str(v).lower())
+                    if tgt:
+                        return tgt
+                return None
+
+            images, labels = [], []
+            counts = defaultdict(int)
+            for item in ds:
+                cond = resolve(item[label_col])
+                if cond is None:
+                    continue
+                ci = mf.LABEL_TO_IDX.get(cond, -1)
+                if ci < 0 or counts[ci] >= n_per_class:
+                    continue
+                try:
+                    img = item[img_col]
+                    img = (img.convert("RGB") if isinstance(img, PILImage.Image)
+                           else PILImage.fromarray(img).convert("RGB"))
+                    images.append(transform(img).half())
+                    labels.append([ci])
+                    counts[ci] += 1
+                except Exception:
+                    continue
+                if all(counts[i] >= n_per_class
+                       for i in range(len(mf.CONDITION_LABELS))):
+                    break
+
+            print(f"  Loaded {len(images)} REAL images: {dict(counts)}")
+            return images, labels
+        except Exception as e:
+            print(f"  HF load failed ({e}). Using synthetic X-ray fallback.")
+            return mf.generate_synthetic_image_data(
+                n_per_class * len(mf.CONDITION_LABELS), img_size)
+
+    mf.load_hf_medical_images = load_hf_medical_images
+    print("  [patch] image loader (ClassLabel resolution) installed")
+    return True
+
+
 def load_base(base_py: str):
     """Import MedFederate_Colab_Complete.py without firing its __main__ block."""
     base_py = str(base_py)
@@ -1057,6 +1145,7 @@ def main(base_py: str, tier: str = "standard", out: str = "results_v2.json",
     _patch_transformers()
     _patch_datasets()
     mf = load_base(base_py)
+    _patch_image_loader(mf)
     if not verify_encoders(mf, [t["text_model"]]):
         raise SystemExit(
             "\nStopping: the text encoder is not loading pretrained weights, "
