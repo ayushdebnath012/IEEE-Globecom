@@ -1,0 +1,212 @@
+\section{Results}
+\label{sec:results}
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=0.81\textwidth,height=4.05in,keepaspectratio]{reviewer_matched_results}
+\caption{Matched results (two-seed mean$\pm$SD unless noted). (a)~Severe-skew
+baselines; local-only is a five-client mean from one partition, iterative arms use
+$8$ rounds of $3$ epochs. (b)~Iterative convergence. (c)~Anti-collapse F1, diamonds
+for minimum predicted-class diversity. (d)~Eight fusion rules trained in-loop at
+$\alpha{=}0.1$. (e)~Federated initialization (round-1 diamonds) and separated
+non-federated abort controls, whose trigger never fires. (f)~P-FIN-style adaptation;
+held-out text forced missing for the primary metric.}
+\label{fig:matched}
+\end{figure*}
+
+\subsection{Matched Baselines under Severe Skew}
+
+Every arm in Fig.~\ref{fig:matched}(a) shares the corpus, partition draw, encoders,
+and optimizer at $\alpha{=}0.1$, $K{=}5$; all but the native-budget FedMME arm also
+share the 24-local-epoch budget. Local-only training averages a macro-F1 score of
+0.310 across the five clients of one partition. Over
+two matched seeds, FedAvg reaches $0.652\!\pm\!0.057$ and FedProx
+$0.685\!\pm\!0.064$. Their 0.033 gap is smaller than either sample standard
+deviation, so these runs do not separate the two methods and we will not pretend
+otherwise. Our SCAFFOLD--AdamW adaptation lands at $0.192\!\pm\!0.129$, and the
+oscillation in panel~(b) points at our AdamW control-variate adaptation rather than
+at classical SGD-based SCAFFOLD. The FedMME-style arm trains five client models
+independently and combines them by equal-weight hard voting with mean-softmax ties. At our matched 24-epoch budget it reaches
+$0.537\!\pm\!0.217$ (seeds 0.690, 0.384), and at FedMME's native 100-epoch budget
+it reaches $0.472\!\pm\!0.225$ (seeds 0.631, 0.312). Quadrupling local computation
+does not close the gap to iterative aggregation, so the gap belongs to one-shot
+aggregation under severe skew, not to a budget handicap. Both budgets are our most
+seed-sensitive arms for a structural reason: one aggregation has no later round in
+which to repair a poor local solution. Every arm except SCAFFOLD--AdamW clears
+local-only training, though the overlapping intervals make that a coarse ordering
+rather than a ranking.
+
+\subsection{Anti-Collapse, Fusion, and Initialization Ablations}
+
+Under severe skew the full class-balanced-sampler and entropy-diversity stack
+reaches $0.716\!\pm\!0.014$ F1 at minimum predicted-class diversity 0.8. Drop the
+sampler, the entropy-diversity term, or both, and F1 falls to
+$0.585\!\pm\!0.148$, $0.701\!\pm\!0.011$, and $0.657\!\pm\!0.057$, with minimum
+diversity $0.7\!\pm\!0.14$, $0.7\!\pm\!0.14$, and $0.6\!\pm\!0.00$
+(Fig.~\ref{fig:matched}(c)). The sampler is the larger and more
+variance-reducing of the two, and only the full stack keeps four of five classes
+predicted every round. The confidence penalty in \eqref{eq:loss} stays fixed
+across all four arms. At $\alpha{=}1$ the same four configurations land within
+$0.809$--$0.834$ with every minimum diversity at or above 0.9. These components earn
+their place under severe skew and are close to inert at moderate skew. One more
+observation: three suites nominally repeat the same severe-skew
+FedAvg/concatenation setting, yet return $0.652\!\pm\!0.057$, $0.674\!\pm\!0.185$,
+and $0.716\!\pm\!0.014$, differing by more than their own spreads. We report them
+separately rather than pool them or quote the flattering one.
+
+Panel~(d) trains all eight fusion rules inside the operational federated loop. The
+means run from $0.603$ for non-residual 384-dimensional cross-attention up to
+$0.787$ for the two-token Transformer encoder, with per-rule sample standard
+deviations of $0.024$--$0.183$. Since the widest interval exceeds the entire
+between-rule spread, the sweep cannot rank fusion operators, and we will not. Projected concatenation, our default everywhere else, sits mid-pack at
+$0.643\!\pm\!0.102$.
+
+Panel~(e) separates three federated initializations at $\alpha{=}1$. The all-random arm
+keeps both architectures but initializes every weight from scratch, opening at 0.635
+round-1 F1 and closing at $0.765\!\pm\!0.010$. Public
+encoders with random task modules, our operational default, open at 0.704 and close
+at $0.839\!\pm\!0.065$. Pooled-start reuses one seed-0 checkpoint from a 12-epoch
+centralized run for both FL seeds, so its pretraining sits outside the shared
+budget; it opens far higher at 0.843 and ends lower at $0.818\!\pm\!0.004$. Public encoders
+buy roughly 0.07 F1 over random initialization; the pooled checkpoint buys a round-1
+head start that does not survive to round~8. It was also selected on the
+reporting validation split, making it a diagnostic, not an unbiased generalization
+estimate. Non-federated abort-off/on
+controls post epoch-12 F1 of $0.825\!\pm\!0.001$ and $0.843\!\pm\!0.032$, best-epoch
+$0.845\!\pm\!0.013$ and $0.884\!\pm\!0.003$, on pooled data with sampling and
+diversity off. All complete 12 epochs at diversity 1.0, so the branch never fires and
+the gap is rerun variation.
+
+Panel~(f) is our matched P-FIN-style adaptation, where 256-dimensional
+$L_2$-normalized features and concatenation plus an MLP replace the source
+bidirectional-attention stack. On the primary forced-missing-text metric the four
+imputation rules order consistently: zero filling $0.465\!\pm\!0.084$, deterministic
+FIN $0.559\!\pm\!0.144$, Gaussian $\beta$-NLL imputation $0.627\!\pm\!0.042$, and
+uncertainty-weighted aggregation $0.653\!\pm\!0.027$. The ordering holds in both
+seeds, and the spread tightens as the method models its own uncertainty, the
+qualitative behavior P-FIN reports. The secondary all-text-observed scores are far
+noisier, $0.429$--$0.657$ with SD up to $0.274$, so missing text is the
+better-determined comparison.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.98\columnwidth,height=1.34in,keepaspectratio]{fig_rag_validated}
+\caption{FAISS exact inner-product retrieval over 2,400 indexed training-note
+vectors for 600 validation-note queries; TF--IDF is fitted on training notes only.
+Bars show top-1 same-label accuracy and same-label precision@5; diamonds show mean
+top-1 cosine similarity with population-SD whiskers. The dashed 0.2 line is a
+five-class label prior, not a similarity baseline; this evaluates retrieval, not
+generation.}
+\label{fig:retrieval}
+\end{figure}
+
+\subsection{Retrieval-Stage Evaluation for Retrieval-Augmented Generation (RAG)}
+
+Exact inner-product FAISS search~\cite{Johnson2021faiss} over training-fitted
+TF--IDF note vectors gives condition-macro averages of 0.522 for top-1 same-label
+retrieval accuracy, 0.459 for same-label precision@5, and 0.707 for mean top-1
+cosine similarity, with the five condition rows covering all 600 validation
+queries (Fig.~\ref{fig:retrieval}). Top-1 accuracy sits well above the 0.2
+five-class label prior yet far below the 0.707 mean similarity. That combination is
+the signature of a template corpus: neighbors come out lexically close whether or
+not they share a label. This check is neither a fine-tuned DistilBERT result nor a
+generated-answer evaluation, and it establishes no clinical retrieval quality.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=0.81\textwidth,height=4.05in,keepaspectratio]{reviewer_systems_scalability}
+\caption{Scalability/resource audit. Two-seed mean$\pm$SD for (a)~macro-F1 score
+($A/K$ is active/nominal clients), (b)~the GPU-synchronized training/aggregation
+section per round, and (c)~peak allocated memory within it. (d)~Formula FP32 volume
+over eight rounds, skipped shards included; not measured traffic. (e)~One-run branch
+cost at $\alpha{=}1,K{=}5$. (f)~Severe-skew seed-0 counts.}
+\label{fig:systems}
+\end{figure*}
+
+\subsection{Scalability, Communication, and Resource Cost}
+
+Figure~\ref{fig:systems}(a) assembles the full Cartesian product of
+$K{=}\{3,5,10,20\}$ and $\alpha{=}\{0.1,1,5\}$, and one factor dominates
+throughout: label skew, not client count. Every $\alpha{=}5$ cell lies in
+$0.874$--$0.896$ and every $\alpha{=}1$ cell in $0.812$--$0.863$, whereas the
+$\alpha{=}0.1$ row drops to $0.615$--$0.741$ with far wider spreads, up to
+$\pm0.185$ at $K{=}5$. Within a row, moving $K$ by a factor of nearly seven shifts
+the mean by at most 0.13 F1, and the $\alpha{=}0.1$ row is not even monotone in
+$K$. Our auxiliary $K{=}5$ checks at $\alpha{=}0.3$ and $0.5$ give
+$0.769\!\pm\!0.043$ and $0.824\!\pm\!0.113$. Cells report $A/K$, where $A$ counts
+clients whose realized shard reaches four samples: allocation is complete except
+under severe skew, where $K{=}10$ retains 9--10 and $K{=}20$ retains 18--20 active
+clients. Panel~(f) shows the realized per-client class counts behind one
+severe-skew cell, where single clients hold entire classes.
+
+Panels~(b) and~(c) report runtime and peak allocated memory for the timed block on
+one shared H100 NVL. Timed sections span 42--114\,s per round and peak memory
+4.77--5.92\,GiB. Neither panel is a scaling curve: the $K{=}5$ column and the
+$\alpha{=}1$ row are inherited from our earlier validated suite and ran in a
+different session, which produces the 5.92\,GiB cells and the slowest timed sections.
+Sequential simulation and contention, not client count, explain the rest.
+
+For $|\theta|$ trainable parameters, $b$ bytes/parameter, $T$ rounds, and
+nominal $K$, the plotted bidirectional volume is
+\begin{equation}
+V_{\mathrm{nom}}=2KT|\theta|b,
+\label{eq:comm}
+\end{equation}
+Here $|\theta|{=}153{,}935{,}621$, $b{=}4$, and $T{=}8$, so a 615,742,484-byte
+model state gives nominal bidirectional volumes of 27.5/45.9/91.8/183.5\,GiB at
+$K{=}3/5/10/20$ ($1$ GiB$=2^{30}$ bytes). We keep the nominal count when $A{<}K$;
+swapping $A$ for $K$ is an alternative estimate, not a measurement. Serialization,
+headers, retransmission, secure aggregation, compression, and algorithm-specific
+state all sit outside it. Panel~(d) puts the
+operating point plainly. Communication grows linearly in $K$ while accuracy stays
+nearly flat in $K$. At $\alpha{=}5$, going from $K{=}3$ to $K{=}20$ buys a 0.014 F1
+change for $6.7\times$ the traffic.
+
+The one-run branch audit in panel~(e) is where the multimodal bill comes due.
+Text, image, and multimodal F1 are 0.893/0.740/0.782, one-way FP32 model-state
+sizes are 0.248/0.324/0.573\,GiB, sums of timed round durations are
+18.5/33.6/45.0\,min, and peak allocated memory is 1.69/3.18/4.77\,GiB. Multimodal
+concatenation costs $2.3\times$ the model state, $2.4\times$ the wall time, and
+$2.8\times$ the memory of the text branch, and it scores 0.111 F1 below that branch.
+One run per branch cannot support a blanket claim of multimodal superiority, and we
+suspect a mundane cause: class-conditioned template shortcuts that the text encoder
+can exploit directly.
+
+\section{Discussion and Limitations}
+
+Partition sensitivity is the finding that survives everything we threw at it: at
+$\alpha{=}0.1$, even identically configured FedAvg reruns move substantially. Three
+boundaries hem in what that buys a deployment. First, our client-count study is a
+sequential simulation on a shared server. It models neither concurrent workers,
+latency, stragglers, and dropout nor heterogeneous accelerators, and we never test
+aggregation against poisoned or Byzantine updates. Our own dispersion hints at why
+that is hard: at $\alpha{=}0.1$ honest updates already spread by $\pm0.185$ F1, so a
+trimmed-mean or median aggregator must discard genuine minority-class signal to
+reject an adversarial one, while sample-weighted FedAvg leaves a large shard
+unbounded leverage. Skew and Byzantine tolerance pull against each other, and
+quantifying that needs a threat model we did not build. Our title's ``robust'' denotes
+these stress tests, nothing stronger. Second, communication.
+Eq.~\eqref{eq:comm} exposes model-state scaling and Fig.~\ref{fig:systems}(e) the
+multimodal footprint, but a real study would measure end-to-end traffic and latency
+under compression, partial participation, and failures. We implement neither secure
+aggregation nor the differentially private training of
+Abadi~\textit{et al.}~\cite{Abadi2016}. Keeping raw examples local is a locality
+property, not a privacy guarantee.
+
+Third, clinical interpretation stays bounded by Section~\ref{sec:corpus}. Neither our
+absolute F1 nor our retrieval scores estimate diagnostic safety, generalization,
+clinical utility, or deployment readiness, and with two seeds our spreads are
+descriptive rather than significant. What we want next is not a longer version of
+this study but a different one: larger multi-site datasets, more seeds,
+native-method replications, calibrated uncertainty, and privacy testing.
+
+\section{Conclusion}
+
+OmniMed-FL is a controlled systems study of multimodal FL, not a clinical
+validation. Across a $4\times3$ client-count/skew grid, eight fusion rules, three
+initializations, four missing-text imputation rules, and matched FedAvg, FedProx,
+SCAFFOLD--AdamW, and FedMME-style baselines, one result holds consistently. Label
+skew dominates. Client count is near-neutral for accuracy and linear in
+communication. Everything else is conditional on the partition realization and our
+protocol choices. Real patient-paired data and safeguards come before clinical use, and we would rather publish the null results
+than imply we have cleared that bar.

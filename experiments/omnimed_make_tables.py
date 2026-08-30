@@ -44,9 +44,14 @@ def parse_key(key: str) -> dict:
 
 
 FUSION_DISPLAY = {
-    "concat": "Concat", "attention": "Cross-Attn", "gated": "Gated",
-    "clip": "CLIP", "flamingo": "Flamingo", "blip2": "BLIP-2",
-    "coca": "CoCa", "unified_io": "Unified-IO",
+    "concat": "Concat (384-d)",
+    "attention": "Residual cross-attn (256-d)",
+    "gated": "Gated residual (256-d)",
+    "clip": "Dual-projection concat (256-d)",
+    "flamingo": "Decoder-style A (256-d)",
+    "blip2": "Decoder-style B (256-d)",
+    "coca": "Cross-attn (384-d)",
+    "unified_io": "Two-token encoder (256-d)",
 }
 
 
@@ -90,10 +95,12 @@ def tab_alpha(d, outdir):
         return None
     rows = []
     f1 = group(exp, "alpha", "f1")
-    div = group(exp, "alpha", "diversity")
     for a in sorted(f1, key=float):
         m, s = agg(f1[a])
-        dm, _ = agg(div[a])
+        min_diversities = [min(rec["history"]["round_div"])
+                           for key, rec in exp.items()
+                           if parse_key(key)["alpha"] == a]
+        dm, _ = agg(min_diversities)
         # realized heterogeneity: mean over clients of max class share
         skews = []
         for key, rec in exp.items():
@@ -110,13 +117,14 @@ def tab_alpha(d, outdir):
         r"\begin{table}[t]",
         r"\caption{Effect of partition heterogeneity on Fed-VLM. $\alpha$ is the",
         r"Dirichlet concentration; \emph{skew} is the realized mean per-client share of",
-        r"the dominant class. Mean\,$\pm$\,std over seeds.}",
+        r"the dominant class and diversity is the minimum predicted-class fraction",
+        r"across rounds. Mean\,$\pm$\,std over seeds.}",
         r"\label{tab:alpha}",
         r"\centering\footnotesize",
         r"\setlength\tabcolsep{5pt}",
         r"\begin{tabular}{lccc}",
         r"\toprule",
-        r"$\alpha$ & Skew & Macro F1 & Diversity\\",
+        r"$\alpha$ & Skew & Macro F1 & Min. div.\\",
         r"\midrule",
     ]
     for a, skew, f, dv in rows:
@@ -133,8 +141,9 @@ def tab_clients(d, outdir):
     tex = [
         r"\begin{table}[t]",
         r"\caption{Scalability in the number of clients $K$ at $\alpha{=}1.0$.",
-        r"Communication is the measured total exchanged over the run,",
-        r"$V=2KT|\theta|b$. Mean\,$\pm$\,std over seeds.}",
+        r"Communication is computed from the FP32 trainable-parameter payload,",
+        r"$V=2KT|\theta|b$; wall-clock is observed on a contended shared server.",
+        r"Mean\,$\pm$\,std over seeds.}",
         r"\label{tab:clients}",
         r"\centering\footnotesize",
         r"\setlength\tabcolsep{5pt}",
@@ -165,8 +174,8 @@ def tab_anticollapse(d, outdir):
     tex = [
         r"\begin{table}[t]",
         r"\caption{Anti-collapse component ablation on Fed-VLM. Each row removes one",
-        r"component from the full stack. Diversity is the fraction of the five classes",
-        r"predicted at the final round. Mean\,$\pm$\,std over seeds.}",
+        r"component from the full stack. Diversity is the minimum fraction of the five",
+        r"classes predicted in any round. Mean\,$\pm$\,std over seeds.}",
         r"\label{tab:anticollapse}",
         r"\centering\footnotesize",
         r"\setlength\tabcolsep{4pt}",
@@ -183,7 +192,7 @@ def tab_anticollapse(d, outdir):
         for a in alphas:
             f1s = [r["f1"] for k, r in exp.items()
                    if parse_key(k).get("variant") == v and parse_key(k)["alpha"] == a]
-            dvs = [r["diversity"] for k, r in exp.items()
+            dvs = [min(r["history"]["round_div"]) for k, r in exp.items()
                    if parse_key(k).get("variant") == v and parse_key(k)["alpha"] == a]
             if not f1s:
                 cells += ["--", "--"]
@@ -202,8 +211,8 @@ def tab_warmstart(d, outdir):
     f1 = group(exp, "warm_start", "f1")
     tex = [
         r"\begin{table}[t]",
-        r"\caption{Warm-start ablation: federated training from centralized",
-        r"pretrained weights versus from a cold initialization.}",
+        r"\caption{Initialization ablation. The pooled-data oracle is diagnostic",
+        r"only and is not part of the operational FL protocol.}",
         r"\label{tab:warmstart}",
         r"\centering\footnotesize",
         r"\begin{tabular}{lcc}",
@@ -211,7 +220,8 @@ def tab_warmstart(d, outdir):
         r"Initialization & Macro F1 & Round-1 F1\\",
         r"\midrule",
     ]
-    for w, name in [("True", "Warm start (pretrained)"), ("False", "Cold start (random)")]:
+    for w, name in [("True", "Pooled-data oracle"),
+                    ("False", "Public encoders + random head")]:
         if w not in f1:
             continue
         m, s = agg(f1[w])
@@ -232,9 +242,14 @@ def tab_fusion(d, outdir):
     ordered = sorted(buckets.items(), key=lambda kv: -np.mean(kv[1]))
     tex = [
         r"\begin{table}[t]",
-        r"\caption{Fusion strategies with repeated seeds. The std column is what",
-        r"decides whether the ordering is real; strategies whose intervals overlap",
-        r"should be treated as tied.}",
+        r"\caption{Pooled-data diagnostic screen of lightweight fusion operators",
+        r"with repeated seeds. This architecture screen is not an operational FL run.",
+        r"Registry variants",
+        r"A and B share the same decoder-layer parameterization and are not distinct",
+        r"foundation models. Values are the best validation Macro F1 within the fixed",
+        r"12-epoch budget. The standard deviation",
+        r"quantifies seed sensitivity; with two seeds, close means are treated as",
+        r"descriptive rather than a statistically resolved ranking.}",
         r"\label{tab:fusionvar}",
         r"\centering\footnotesize",
         r"\begin{tabular}{lcc}",
@@ -256,12 +271,14 @@ def tab_cost(d, outdir):
         return None
     tex = [
         r"\begin{table}[t]",
-        r"\caption{Measured cost per branch at $K{=}5$, $\alpha{=}1.0$. Payload is",
-        r"per client per round; wall-clock and peak memory are measured on the GPU",
-        r"named in the results metadata.}",
+        r"\caption{Cost per branch at $K{=}5$, $\alpha{=}1.0$. FP32 payload is",
+        r"computed from trainable parameters; wall-clock and peak allocated memory",
+        r"are observed on the shared GPU named in the results metadata and include",
+        r"uncontrolled contention.}",
         r"\label{tab:comm}",
         r"\centering\footnotesize",
         r"\setlength\tabcolsep{4pt}",
+        r"\resizebox{\columnwidth}{!}{%",
         r"\begin{tabular}{lccccc}",
         r"\toprule",
         r"Branch & $|\theta|$ & Payload & Total $V$ & s/round & Peak mem.\\",
@@ -278,7 +295,7 @@ def tab_cost(d, outdir):
         mem = r["peak_mib"]
         tex.append(f"{name} & {p:.1f}\\,M & {pay:.0f}\\,MiB & {tot:.1f}\\,GiB "
                    f"& {spr:.0f} & {mem:.0f}\\,MiB \\\\")
-    tex += [r"\bottomrule", r"\end{tabular}", r"\end{table}"]
+    tex += [r"\bottomrule", r"\end{tabular}}", r"\end{table}"]
     return _write(outdir / "tab_measured_cost.tex", tex)
 
 
@@ -319,14 +336,17 @@ def tab_baselines(d, outdir):
     if not exp:
         return None
     label = {"local_only": "Local only (no federation)", "fedavg": "FedAvg",
-             "fedprox": "FedProx", "scaffold": "SCAFFOLD", "fedbn": "FedBN"}
+             "fedprox": "FedProx", "scaffold": "SCAFFOLD-style (AdamW)",
+             "fedbn": "FedBN"}
     alphas = sorted({parse_key(k)["alpha"] for k in exp}, key=float)
 
     tex = [
         r"\begin{table}[t]",
-        r"\caption{Federated aggregation rules under \emph{matched} settings: same",
-        r"Concat-VLM backbone, data, partition, local budget and hyperparameters, so",
-        r"the aggregation rule is the only variable. Mean\,$\pm$\,std over seeds.}",
+        r"\caption{Federated algorithms under \emph{matched} settings: same",
+        r"Concat-VLM backbone, data, partition, local budget and hyperparameters.",
+        r"Among federated rows, the update rule is the only variable; the local-only",
+        r"row is the no-federation reference. Federated rows are",
+        r"mean\,$\pm$\,std over seeds.}",
         r"\label{tab:baselines}",
         r"\centering\footnotesize",
         r"\setlength\tabcolsep{5pt}",
@@ -335,7 +355,10 @@ def tab_baselines(d, outdir):
         r"\textbf{Method} & " + " & ".join(rf"$\alpha={a}$" for a in alphas) + r"\\",
         r"\midrule",
     ]
+    present_methods = {parse_key(k).get("variant") for k in exp}
     for m in ["local_only", "fedavg", "fedprox", "scaffold", "fedbn"]:
+        if m not in present_methods:
+            continue
         cells = []
         for a in alphas:
             if m == "local_only":
@@ -345,7 +368,8 @@ def tab_baselines(d, outdir):
                     cells.append("--")
                     continue
                 r = recs[0]
-                cells.append(f"{r['mean_f1']:.3f}")
+                cells.append(
+                    f"{r['mean_f1']:.3f} [{r['worst_f1']:.3f}, {r['best_f1']:.3f}]")
             else:
                 vals = [r["f1"] for k, r in exp.items()
                         if parse_key(k).get("variant") == m and parse_key(k)["alpha"] == a]
@@ -359,7 +383,9 @@ def tab_baselines(d, outdir):
         r"\bottomrule", r"\end{tabular}",
         r"\vspace{1pt}", "",
         r"{\scriptsize Local-only is the mean over the five clients, each trained on its",
-        r"own shard alone. Every other row is the global model after $T$ rounds.}",
+        r"own shard alone, evaluated at its final matched-budget epoch; brackets give",
+        r"the client range for that seed-0 partition. Every other",
+        r"row is the global model after $T$ rounds.}",
         r"\end{table}",
     ]
     return _write(outdir / "tab_baselines.tex", tex)
@@ -424,26 +450,70 @@ def summary(d, outdir):
         f1 = group(e1, "alpha", "f1")
         xs = sorted(f1, key=float)
         lo, hi = np.mean(f1[xs[0]]), np.mean(f1[xs[-1]])
-        ref = np.mean(f1["1.0"]) if "1.0" in f1 else hi
         L += ["## E1 alpha sweep (R3.1)",
               f"- most heterogeneous (alpha={xs[0]}): F1 {lo:.3f}",
-              f"- least heterogeneous (alpha={xs[-1]}): F1 {hi:.3f}",
-              f"- cost of severe heterogeneity vs the paper's alpha=1.0: {lo-ref:+.3f}",
-              "- If that cost is small, the 99.1% retention claim generalizes beyond "
-              "alpha=1.0 and you can say so. If it is large, the claim must be scoped "
-              "to moderate heterogeneity.", ""]
+              f"- least heterogeneous completed setting (alpha={xs[-1]}): F1 {hi:.3f}"]
+        if "1.0" in f1:
+            ref = np.mean(f1["1.0"])
+            L += [f"- change at severe heterogeneity relative to alpha=1.0: {lo-ref:+.3f}",
+                  "- This comparison measures sensitivity to partition skew within "
+                  "the reviewer suite. It does not, by itself, establish retention "
+                  "relative to centralized training."]
+        else:
+            L.append("- alpha=1.0 is not complete; no comparison with the paper's "
+                     "reference setting is reported yet.")
+        L.append("")
 
     e3 = d.get("E3_anticollapse")
     if e3:
         L += ["## E3 anti-collapse ablation (R3.2)"]
         for v in ["full", "no_balanced", "no_diversity", "neither"]:
             vals = [r["f1"] for k, r in e3.items() if parse_key(k).get("variant") == v]
-            dvs = [r["diversity"] for k, r in e3.items() if parse_key(k).get("variant") == v]
+            dvs = [min(r["history"]["round_div"]) for k, r in e3.items()
+                   if parse_key(k).get("variant") == v]
             if vals:
-                L.append(f"- {v}: F1 {np.mean(vals):.3f}, final diversity {np.mean(dvs):.2f}")
+                L.append(f"- {v}: F1 {np.mean(vals):.3f}, minimum diversity {np.mean(dvs):.2f}")
         L += ["- This is the table the reviewer asked for. If `neither` does not "
               "collapse, the anti-collapse stack is not doing the work the paper "
-              "attributes to it -- say that rather than keep the claim.", ""]
+               "attributes to it -- say that rather than keep the claim.", ""]
+
+    e2 = d.get("E2_client_sweep")
+    if e2:
+        by_k = group(e2, "K", "f1")
+        L += ["## E2 client scaling (R3.4)"]
+        for clients in sorted(by_k, key=int):
+            vals = by_k[clients]
+            times = [r["wall_seconds"] for k, r in e2.items()
+                     if parse_key(k)["K"] == clients]
+            L.append(f"- K={clients}: F1 {np.mean(vals):.3f}+-{np.std(vals, ddof=1):.3f}, "
+                     f"wall-clock {np.mean(times):.0f} s")
+        L.append("")
+
+    e3b = d.get("E3b_early_abort")
+    if e3b:
+        L += ["## E3b early-abort ablation (R3.2)"]
+        for setting in ("True", "False"):
+            vals = [r["f1"] for k, r in e3b.items()
+                    if parse_key(k)["early_abort"] == setting]
+            if vals:
+                L.append(f"- early_abort={setting}: F1 {np.mean(vals):.3f}+-"
+                         f"{np.std(vals, ddof=1):.3f}")
+        L.append("")
+
+    e4 = d.get("E4_warmstart")
+    if e4:
+        L += ["## E4 initialization ablation (R3.2)"]
+        for setting, name in (("False", "operational cold start"),
+                              ("True", "pooled-data oracle")):
+            recs = [r for k, r in e4.items()
+                    if parse_key(k)["warm_start"] == setting]
+            if recs:
+                vals = [r["f1"] for r in recs]
+                r1 = [r["history"]["round_f1"][0] for r in recs]
+                L.append(f"- {name}: final F1 {np.mean(vals):.3f}+-"
+                         f"{np.std(vals, ddof=1):.3f}; round-1 {np.mean(r1):.3f}")
+        L += ["- The pooled-data arm is a non-deployable diagnostic oracle, not the "
+              "initialization used by the operational federated experiments.", ""]
 
     e5 = d.get("E5_fusion_seeds")
     if e5:
@@ -468,8 +538,8 @@ def summary(d, outdir):
               f"({a/b_:.2f}x)",
               f"- Fed-VLM {np.mean(e6['Fed-VLM']['history']['round_seconds']):.0f} s/round, "
               f"peak {e6['Fed-VLM']['peak_mib']:.0f} MiB",
-              "- These replace the analytic Table V. Swap them in and delete the "
-              "'analytic, not measured' caveat.", ""]
+              "- Runtime and peak allocated memory are measured. Communication "
+              "remains a deterministic calculation from the FP32 payload.", ""]
 
     e8 = d.get("E8_baselines")
     if e8:
@@ -489,9 +559,10 @@ def summary(d, outdir):
               "the paper run under matched conditions. Two readings matter: how far "
               "every federated arm sits above local-only (that is what federation "
               "buys), and whether the drift-correcting methods separate from FedAvg "
-              "at low alpha. If FedProx/SCAFFOLD beat FedAvg at alpha=0.1, say so and "
-              "switch the aggregator -- do not keep FedAvg because it is what the "
-              "submitted version used.", ""]
+              "at low alpha. With two seeds, report any separation descriptively; "
+              "do not claim significance or switch the deployed method on this table "
+              "alone. The SCAFFOLD row is an AdamW adaptation, not the classical SGD "
+              "algorithm.", ""]
 
     e7 = (d.get("E7_rag") or {}).get("heldout")
     if e7 and "error" not in e7:
@@ -512,14 +583,16 @@ def _write(path: Path, lines):
     return path
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--results", required=True)
-    ap.add_argument("--outdir", default=".")
-    a = ap.parse_args()
+def main(results=None, outdir=None):
+    if results is None:
+        ap = argparse.ArgumentParser()
+        ap.add_argument("--results", required=True)
+        ap.add_argument("--outdir", default=".")
+        a = ap.parse_args()
+        results, outdir = a.results, a.outdir
 
-    d = json.loads(Path(a.results).read_text())
-    outdir = Path(a.outdir)
+    d = json.loads(Path(results).read_text())
+    outdir = Path(outdir or ".")
     outdir.mkdir(parents=True, exist_ok=True)
 
     made = [f for f in [tab_alpha(d, outdir), tab_clients(d, outdir),

@@ -1,0 +1,19 @@
+\begin{table}[t]
+\caption{Cost per branch at $K{=}5$, $\alpha{=}1.0$. FP32 payload is
+computed from trainable parameters; wall-clock and peak allocated memory
+are observed on the shared GPU named in the results metadata and include
+uncontrolled contention.}
+\label{tab:comm}
+\centering\footnotesize
+\setlength\tabcolsep{4pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lccccc}
+\toprule
+Branch & $|\theta|$ & Payload & Total $V$ & s/round & Peak mem.\\
+\midrule
+Fed-LLM & 66.6\,M & 254\,MiB & 19.8\,GiB & 139 & 1731\,MiB \\
+Fed-ViT & 86.9\,M & 332\,MiB & 25.9\,GiB & 252 & 3253\,MiB \\
+Fed-VLM & 153.9\,M & 587\,MiB & 45.9\,GiB & 337 & 4884\,MiB \\
+\bottomrule
+\end{tabular}}
+\end{table}

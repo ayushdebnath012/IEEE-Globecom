@@ -5,39 +5,59 @@ Multimodal federated learning for five-class clinical condition classification
 
 Submitted to IEEE GLOBECOM.
 
+> **The earlier results in this repository are withdrawn.** Between submission and
+> this revision the entire experimental suite was re-run under audit, and several
+> headline numbers did not survive. They are withdrawn rather than defended: the
+> original comparison table, the "18 model variants" framing, the five-LLM/five-ViT
+> encoder sweep, the 99.1% centralized-retention claim, and the 0.89
+> retrieval-similarity claim are all gone. The revised manuscript reports *different
+> and lower* scores than the version the reviewers saw. `paper/` is the audited
+> version; `paper/RESPONSE_TO_REVIEWERS.md` itemizes every correction and
+> `experiments/METHODOLOGY_AUDIT.md` explains why the earlier runs were invalid.
+> The pre-audit figures that used to live in `paper/omnimed_plots/` have been
+> removed; they remain in git history.
+
 ```
-paper/        the manuscript, its figures, and the compiled PDF
-experiments/  reviewer-requested experiment suite (runs on Colab)
-source/       training code and the results that back every number in the paper
+paper/        the audited manuscript, its figures, and the compiled PDF
+experiments/  reviewer-requested experiment suite (runs on Colab) and the audit
+source/       training code, and the results behind the withdrawn submission
 ```
 
 ## paper/
 
 | File | |
 |---|---|
-| `Globecom_final.tex` | manuscript source (IEEEtran, 7 pages) |
+| `Globecom_final.tex` | manuscript source (IEEEtran, 6 pages) |
 | `Globecom_final.pdf` | compiled |
-| `omnimed_plots/` | every figure |
+| `results_corrected.tex` | the Results section, `\input` by the manuscript |
+| `generated/` | audited figures and the generated LaTeX tables |
+| `RESPONSE_TO_REVIEWERS.md` | reply to the reviewers, and the withdrawn claims |
 
-Compiles with `pdflatex` in three passes. Three duplicate figures are commented
-out for length; each is one `%`-block from returning.
+Compiles with `pdflatex` in three passes. `\graphicspath` points at `generated/`,
+so the tree compiles as-is. Every number and figure in it comes from
+`experiments/reviewer_results_merged.json`.
 
 ## source/
+
+The pipeline as it stood for the original submission.
 
 | File | |
 |---|---|
 | `MedFederate_Colab_Complete.py` | the full training pipeline: data, models, FedAvg |
 | `MedFederate_Kaggle.py` | Kaggle variant |
-| `gen_medfederate_plots.py` | regenerates the paper figures from the results |
-| `results/*.json` | measured results — the provenance for every number reported |
+| `gen_medfederate_plots.py` | regenerates the pre-audit figures from the results |
+| `results/*.json` | the measured results behind the submitted version |
 
-`results/medfederate_results.json` is the authoritative record: per-variant Macro F1,
-per-epoch histories, federated round histories, the retrieval probe, and the
-31-system benchmark compilation. Every figure and table in the paper derives from it.
+`results/medfederate_results.json` is the record for the **submitted** paper, not the
+revision: per-variant Macro F1, per-epoch histories, federated round histories, the
+retrieval probe, and the 31-system benchmark compilation. It is kept for provenance.
+The audited numbers that the current manuscript reports are in `experiments/`, and
+where the two disagree the audited set is the correct one.
 
 ## experiments/
 
-The experiments the reviewers asked for that the submitted results do not contain.
+The experiments the reviewers asked for that the submitted results do not contain,
+plus the audit that invalidated the earlier run set.
 
 | | Experiment | Reviewer point |
 |---|---|---|
@@ -69,6 +89,23 @@ finishes and skipped on re-run, so a disconnect costs at most one run. Call
 `omnimed_experiments.py` / `omnimed_make_tables.py` are the same code as separate
 modules, with `OmniMed_Experiments.ipynb` as a cell-by-cell driver. Use whichever
 you prefer.
+
+### the audit
+
+| File | |
+|---|---|
+| `METHODOLOGY_AUDIT.md` | what invalidated the earlier runs, and which chunks are eligible |
+| `validate_results.py` | the conflict check the merged artifact has to pass |
+| `results_corrected_merged.json` | the validated artifact, SHA-256 recorded in the audit |
+| `reviewer_results_merged.json` | the merge the manuscript's numbers come from |
+| `make_*.py` | regenerate each audited figure in `paper/generated/` |
+
+`results_corrected_merged.json` hashes to the SHA-256 written down in
+`METHODOLOGY_AUDIT.md`, so the audited set can be checked rather than taken on trust:
+
+```sh
+sha256sum experiments/results_corrected_merged.json
+```
 
 ## Notes
 

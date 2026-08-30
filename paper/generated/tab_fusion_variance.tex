@@ -1,0 +1,26 @@
+\begin{table}[t]
+\caption{Pooled-data diagnostic screen of lightweight fusion operators
+with repeated seeds. This architecture screen is not an operational FL run.
+Registry variants
+A and B share the same decoder-layer parameterization and are not distinct
+foundation models. Values are the best validation Macro F1 within the fixed
+12-epoch budget. The standard deviation
+quantifies seed sensitivity; with two seeds, close means are treated as
+descriptive rather than a statistically resolved ranking.}
+\label{tab:fusionvar}
+\centering\footnotesize
+\begin{tabular}{lcc}
+\toprule
+Fusion & Macro F1 & Seeds\\
+\midrule
+Decoder-style B (256-d) & 0.913\,$\pm$\,0.008 & 2 \\
+Two-token encoder (256-d) & 0.902\,$\pm$\,0.047 & 2 \\
+Decoder-style A (256-d) & 0.899\,$\pm$\,0.037 & 2 \\
+Residual cross-attn (256-d) & 0.888\,$\pm$\,0.012 & 2 \\
+Concat (384-d) & 0.867\,$\pm$\,0.044 & 2 \\
+Gated residual (256-d) & 0.862\,$\pm$\,0.021 & 2 \\
+Dual-projection concat (256-d) & 0.841\,$\pm$\,0.002 & 2 \\
+Cross-attn (384-d) & 0.754\,$\pm$\,0.015 & 2 \\
+\bottomrule
+\end{tabular}
+\end{table}

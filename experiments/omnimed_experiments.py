@@ -311,10 +311,14 @@ def set_seed(seed: int):
 
 
 def build_data(mf, cfg, cache_path: Path):
-    """Reproduce the data pipeline of run_training() and cache the result.
+    """Build the controlled multimodal proxy corpus and cache it.
 
-    Kept deliberately identical to the original so the alpha sweep differs from
-    the submitted run in alpha alone.
+    Images come from the patched public-radiograph loader, with a synthetic fill
+    only for unavailable classes. Text is generated from class-conditioned
+    clinical templates. We intentionally do not use ``load_hf_medical_text``:
+    that path assigns labels by searching a passage for disease keywords and
+    then feeds the same passage to the classifier, which leaks the target into
+    the input and inflates text and fusion scores.
     """
     if cache_path.exists():
         print(f"  [data] loading cache {cache_path}")
@@ -322,23 +326,20 @@ def build_data(mf, cfg, cache_path: Path):
             return pickle.load(fh)
 
     print("  [data] building (first run only; this is the slow part)")
+    # Make source subsampling, oversampling, final shuffle, and template
+    # generation explicit functions of the configured data seed rather than an
+    # import-time side effect in the base module.
+    set_seed(cfg.seed)
     images, i_labels = mf.load_medical_image_data(
         n_per_class=cfg.max_samples_per_class, img_size=cfg.image_size)
     images, i_labels = mf.balance_image_dataset(
         images, i_labels, cfg.max_samples_per_class)
 
-    pool = mf.load_hf_medical_text(n_per_class=cfg.max_samples_per_class * 2)
-    ptrs = {i: 0 for i in range(5)}
-    texts, t_labels = [], []
-    for lbl in i_labels:
-        ci = lbl[0] if isinstance(lbl, (list, tuple)) else int(lbl)
-        p = pool.get(ci, [])
-        if ptrs[ci] < len(p):
-            texts.append(p[ptrs[ci]])
-            ptrs[ci] += 1
-        else:
-            texts.append(mf.generate_synthetic_text_data(1, target_labels=[[ci]])["text"].iloc[0])
-        t_labels.append([ci])
+    text_df = mf.generate_synthetic_text_data(
+        len(i_labels), target_labels=i_labels)
+    texts = text_df["text"].tolist()
+    t_labels = [[lbl[0] if isinstance(lbl, (list, tuple)) else int(lbl)]
+                for lbl in i_labels]
 
     n_train = int(len(texts) * cfg.train_split)
     data = dict(
@@ -420,13 +421,15 @@ def federated_train_ex(mf, model_class, model_kwargs, train_dataset, val_loader,
 
     diversity_weight=0.0 disables the entropy diversity term.
     use_balanced_sampler=False falls back to a plain shuffled DataLoader.
-    warm_start_state=None means clients start from a fresh (cold) init.
+    warm_start_state=None means public pretrained encoders with freshly
+    initialized task-specific projection and classification heads.
     """
     set_seed(seed)
     global_model = model_class(**model_kwargs).to(device)
     if warm_start_state is not None:
         global_model.load_state_dict(warm_start_state, strict=False)
 
+    trainable_keys = {n for n, p in global_model.named_parameters() if p.requires_grad}
     upload_bytes = trainable_bytes(global_model, dtype_bytes=4)
     splits = mf.split_data_non_iid(train_dataset, num_clients, alpha)
     sizes = [len(s) for s in splits]
@@ -452,7 +455,7 @@ def federated_train_ex(mf, model_class, model_kwargs, train_dataset, val_loader,
                 if len(splits[k]) < 4:
                     with torch.no_grad():
                         for key, val in global_model.state_dict().items():
-                            if not torch.is_floating_point(val):
+                            if key not in trainable_keys or not torch.is_floating_point(val):
                                 continue
                             agg.setdefault(key, torch.zeros_like(
                                 val, dtype=torch.float32, device="cpu"))
@@ -483,13 +486,12 @@ def federated_train_ex(mf, model_class, model_kwargs, train_dataset, val_loader,
                             torch.nn.utils.clip_grad_norm_(local_model.parameters(), 1.0)
                             opt.step()
                         except RuntimeError as e:
-                            # OOM or shape mismatch: surface it rather than swallow
-                            print(f"    [warn] client {k}: {e}")
-                            break
+                            raise RuntimeError(
+                                f"client {k} failed during federated training") from e
 
                 with torch.no_grad():
                     for key, val in local_model.state_dict().items():
-                        if not torch.is_floating_point(val):
+                        if key not in trainable_keys or not torch.is_floating_point(val):
                             continue
                         agg.setdefault(key, torch.zeros_like(
                             val, dtype=torch.float32, device="cpu"))
@@ -561,6 +563,7 @@ def centralized_train(mf, model, train_loader, val_loader, cfg, device,
     crit = mf.CombinedLoss(num_classes=5, diversity_weight=diversity_weight)
     hist = {"val_f1": [], "val_acc": [], "diversity": [], "epoch_seconds": []}
     best = {"f1": -1.0}
+    best_state = None
     collapse_c = 0
 
     for ep in range(epochs):
@@ -575,8 +578,7 @@ def centralized_train(mf, model, train_loader, val_loader, cfg, device,
                     torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                     opt.step()
                 except RuntimeError as e:
-                    print(f"    [warn] {e}")
-                    break
+                    raise RuntimeError("centralized training batch failed") from e
         m = mf.evaluate(model, val_loader, device, model_type)
         hist["val_f1"].append(float(m["f1"]))
         hist["val_acc"].append(float(m["accuracy"]))
@@ -600,10 +602,13 @@ def centralized_train(mf, model, train_loader, val_loader, cfg, device,
         if m["f1"] > best["f1"]:
             best = {"f1": float(m["f1"]), "accuracy": float(m["accuracy"]),
                     "diversity": float(m["diversity"]), "epoch": ep + 1}
+            best_state = mf.clone_state_dict_to_cpu(model)
         print(f"    {log_prefix}ep {ep+1}/{epochs}  F1={m['f1']:.4f} "
               f"div={m['diversity']:.2f}  {gm.seconds:.1f}s")
 
-    state = mf.clone_state_dict_to_cpu(model)
+    # Downstream federated runs must start from the checkpoint corresponding to
+    # the reported best validation score, not silently from the final epoch.
+    state = best_state if best_state is not None else mf.clone_state_dict_to_cpu(model)
     result = {**best, "history": hist,
               "wall_seconds": float(np.sum(hist["epoch_seconds"])),
               "min_diversity": float(np.min(hist["diversity"])) if hist["diversity"] else 0.0,
@@ -672,6 +677,7 @@ def federated_train_algo(mf, model_class, model_kwargs, train_dataset, val_loade
     if warm_start_state is not None:
         global_model.load_state_dict(warm_start_state, strict=False)
 
+    trainable_keys = {n for n, p in global_model.named_parameters() if p.requires_grad}
     upload = trainable_bytes(global_model, 4)
     splits = mf.split_data_non_iid(train_dataset, num_clients, alpha)
     sizes = [len(s) for s in splits]
@@ -682,7 +688,7 @@ def federated_train_algo(mf, model_class, model_kwargs, train_dataset, val_loade
     if algorithm == "scaffold":
         c_server = {k: torch.zeros_like(v, dtype=torch.float32, device="cpu")
                     for k, v in global_model.state_dict().items()
-                    if torch.is_floating_point(v)}
+                    if k in trainable_keys and torch.is_floating_point(v)}
         c_client = [{k: v.clone() for k, v in c_server.items()}
                     for _ in range(num_clients)]
 
@@ -694,7 +700,7 @@ def federated_train_algo(mf, model_class, model_kwargs, train_dataset, val_loade
             agg, new_c = {}, []
             global_state = {k: v.detach().cpu().float()
                             for k, v in global_model.state_dict().items()
-                            if torch.is_floating_point(v)}
+                            if k in trainable_keys and torch.is_floating_point(v)}
 
             for k in range(num_clients):
                 w = sizes[k] / total
@@ -747,12 +753,12 @@ def federated_train_algo(mf, model_class, model_kwargs, train_dataset, val_loade
                             opt.step()
                             steps += 1
                         except RuntimeError as e:
-                            print(f"    [warn] client {k}: {e}")
-                            break
+                            raise RuntimeError(
+                                f"client {k} failed during {algorithm} training") from e
 
                 local_state = {kk: vv.detach().cpu().float()
                                for kk, vv in local_model.state_dict().items()
-                               if torch.is_floating_point(vv)}
+                               if kk in trainable_keys and torch.is_floating_point(vv)}
 
                 if algorithm == "scaffold":
                     denom = max(steps, 1) * cfg.learning_rate
@@ -825,24 +831,35 @@ def local_only_baseline(mf, model_class, model_kwargs, train_dataset, val_loader
     """
     set_seed(seed)
     splits = mf.split_data_non_iid(train_dataset, num_clients, alpha)
-    per_client = []
+    per_client, per_client_best = [], []
     for k, idx in enumerate(splits):
         if len(idx) < 8:
             continue
         ds = Subset(train_dataset, idx)
         lbls = [train_dataset[i]["labels"].argmax().item() for i in idx]
         loader = mf.create_balanced_dataloader(ds, lbls, cfg.batch_size, 5)
+        # Construct each client model after setting its seed. centralized_train
+        # sets the training RNG, but doing that only after construction leaves
+        # the random task heads dependent on whichever experiment ran before it.
+        set_seed(seed + k)
         model = model_class(**model_kwargs)
         res, _ = centralized_train(mf, model, loader, val_loader, cfg, device,
-                                   model_type, epochs=epochs, seed=seed,
+                                   model_type, epochs=epochs, seed=seed + k,
+                                   use_early_abort=False,
                                    log_prefix=f"[local c{k}] ")
-        per_client.append(res["f1"])
+        # Federated arms are evaluated after their final (eighth) round. Use the
+        # final local epoch here as well; selecting each client's best validation
+        # epoch would give the no-federation baseline extra oracle selection.
+        per_client.append(res["history"]["val_f1"][-1])
+        per_client_best.append(res["f1"])
     return {"per_client_f1": per_client,
+            "per_client_best_epoch_f1": per_client_best,
             "mean_f1": float(np.mean(per_client)) if per_client else 0.0,
             "std_f1": float(np.std(per_client)) if len(per_client) > 1 else None,
             "best_f1": float(np.max(per_client)) if per_client else 0.0,
             "worst_f1": float(np.min(per_client)) if per_client else 0.0,
-            "num_clients": num_clients, "alpha": alpha}
+            "num_clients": num_clients, "alpha": alpha,
+            "epochs_per_client": epochs, "early_abort": False}
 
 
 def run_all(mf, store: Store, tier: dict, cfg, data, device, tokenizer, only=None):
@@ -860,21 +877,47 @@ def run_all(mf, store: Store, tier: dict, cfg, data, device, tokenizer, only=Non
         mf, data, cfg, tokenizer, balanced=True)
     _, _, unbal_loader, _ = make_mm_loaders(mf, data, cfg, tokenizer, balanced=False)
 
-    # -- warm-start state: one centralized run, reused by E1/E2/E3/E4/E8 ------
-    # Only pay for it if something in this chunk actually consumes it; E5/E6/E7
-    # do not, and it costs a full centralized training run.
-    needs_warm = any(want(t) for t in ("E1", "E2", "E3", "E4", "E8"))
-    if needs_warm and not store.has("_warmstart", "concat"):
-        print("\n[warm-start] centralized Concat VLM (shared by E1-E4, E8)")
+    # -- pooled-data oracle used only by the explicit E4 ablation -------------
+    # The operational federated experiments must start from public pretrained
+    # encoders plus a random task head. Initializing them from a model trained on
+    # the same pooled client corpus would leak centralized access into the FL
+    # protocol and make a high centralized-retention number circular.
+    needs_warm = want("E4")
+    # Scope the checkpoint to this result store. Independent chunks are often
+    # launched concurrently (for example, results_v2.json and results_e8.json).
+    # A single shared filename lets the slower job overwrite the faster job's
+    # initialization, so a later resume can silently use different weights from
+    # the runs already recorded in its JSON.
+    store_stem = Path(store.path).stem
+    warm_path = Path(store.path).parent / f"warmstart_{store_stem}_concat.pt"
+    # Gate on the weights file, not on the results-file record. Across a chunked
+    # run the two live in different places: the record travels inside
+    # results_v2.json, the weights are a separate .pt that a resuming session may
+    # not have re-uploaded. Trusting the record alone would skip training and
+    # leave warm_state=None, so E4's pooled-data oracle arm would quietly become
+    # the normal cold-start protocol.
+    if needs_warm and not warm_path.exists():
+        if store.has("_warmstart", "concat"):
+            raise SystemExit(
+                "\nWarm-start metrics exist in the result store, but the matching "
+                f"checkpoint is missing: {warm_path}. Refusing to retrain it "
+                "silently because that would mix different initializations in one "
+                "resumed experiment. Restore the checkpoint or start a new result "
+                "store.")
+        print("\n[E4 oracle] centralized Concat VLM on the pooled corpus")
+        set_seed(0)
         model = mf.MultiModalClassifier(**mm_kwargs)
         res, state = centralized_train(mf, model, train_loader, val_loader, cfg,
                                        device, "multimodal",
                                        epochs=tier["central_epochs"],
                                        seed=0, log_prefix="[warm] ")
-        torch.save(state, Path(store.path).parent / "warmstart_concat.pt")
+        torch.save(state, warm_path)
         store.put("_warmstart", "concat", {k: v for k, v in res.items() if k != "history"})
-    warm_path = Path(store.path).parent / "warmstart_concat.pt"
     warm_state = torch.load(warm_path, map_location="cpu") if warm_path.exists() else None
+    if needs_warm and warm_state is None:
+        raise SystemExit(
+            "Warm-start weights unavailable but this chunk needs them. Refusing to "
+            "continue: the results would look fine and be silently invalid.")
 
     # ---- E1: alpha sweep ---------------------------------------------------
     if not want('E1'):
@@ -892,7 +935,7 @@ def run_all(mf, store: Store, tier: dict, cfg, data, device, tokenizer, only=Non
                     mf, mf.MultiModalClassifier, mm_kwargs, train_ds, val_loader,
                     cfg, device, "multimodal", alpha=alpha, num_clients=5,
                     rounds=tier["fed_rounds"], local_epochs=tier["local_epochs"],
-                    warm_start_state=warm_state, seed=seed, log_prefix=f"[a={alpha} s={seed}] ")
+                    warm_start_state=None, seed=seed, log_prefix=f"[a={alpha} s={seed}] ")
                 store.put("E1_alpha_sweep", key, r)
 
     # ---- E2: client-count sweep -------------------------------------------
@@ -911,7 +954,7 @@ def run_all(mf, store: Store, tier: dict, cfg, data, device, tokenizer, only=Non
                     mf, mf.MultiModalClassifier, mm_kwargs, train_ds, val_loader,
                     cfg, device, "multimodal", alpha=1.0, num_clients=K,
                     rounds=tier["fed_rounds"], local_epochs=tier["local_epochs"],
-                    warm_start_state=warm_state, seed=seed, log_prefix=f"[K={K} s={seed}] ")
+                    warm_start_state=None, seed=seed, log_prefix=f"[K={K} s={seed}] ")
                 store.put("E2_client_sweep", key, r)
 
     # ---- E3: anti-collapse component ablation ------------------------------
@@ -939,7 +982,7 @@ def run_all(mf, store: Store, tier: dict, cfg, data, device, tokenizer, only=Non
                         mf, mf.MultiModalClassifier, mm_kwargs, train_ds, val_loader,
                         cfg, device, "multimodal", alpha=alpha, num_clients=5,
                         rounds=tier["fed_rounds"], local_epochs=tier["local_epochs"],
-                        warm_start_state=warm_state, seed=seed,
+                        warm_start_state=None, seed=seed,
                         log_prefix=f"[{vname} a={alpha}] ", **vkw)
                     store.put("E3_anticollapse", key, r)
 
@@ -953,6 +996,7 @@ def run_all(mf, store: Store, tier: dict, cfg, data, device, tokenizer, only=Non
                     print(f"  skip {key}")
                     continue
                 print(f"  {key}")
+                set_seed(seed)
                 model = mf.MultiModalClassifier(**mm_kwargs)
                 res, _ = centralized_train(
                     mf, model, unbal_loader, val_loader, cfg, device, "multimodal",
@@ -965,7 +1009,7 @@ def run_all(mf, store: Store, tier: dict, cfg, data, device, tokenizer, only=Non
     if not want('E4'):
         print('skipping E4')
     else:
-        print("\n=== E4  Warm-start ablation ===")
+        print("\n=== E4  Pooled-data oracle initialization ablation ===")
         for warm in (True, False):
             for seed in tier["seeds"]:
                 key = f"warm_start={warm}|seed={seed}"
@@ -994,6 +1038,7 @@ def run_all(mf, store: Store, tier: dict, cfg, data, device, tokenizer, only=Non
                     continue
                 print(f"  {key}")
                 kw = dict(mm_kwargs, fusion_type=fusion)
+                set_seed(seed)
                 model = mf.MultiModalClassifier(**kw)
                 res, _ = centralized_train(
                     mf, model, train_loader, val_loader, cfg, device, "multimodal",
@@ -1042,7 +1087,11 @@ def run_all(mf, store: Store, tier: dict, cfg, data, device, tokenizer, only=Non
         print('skipping E8')
     else:
         print("\n=== E8  Federated baselines, matched settings ===")
-        algos = ["fedavg", "fedprox", "scaffold", "fedbn"]
+        # FedBN is intentionally omitted: both active encoders use LayerNorm,
+        # and a single server-side validation model cannot meaningfully evaluate
+        # client-private normalization state. Reporting that implementation as a
+        # FedBN baseline would be misleading.
+        algos = ["fedavg", "fedprox", "scaffold"]
         # Run at moderate AND severe heterogeneity: the drift-correcting methods
         # exist for the severe case, so alpha=1.0 alone would not separate them.
         e8_alphas = sorted({1.0, 0.1} & set(tier["alphas"])) or [tier["alphas"][0]]
@@ -1058,7 +1107,7 @@ def run_all(mf, store: Store, tier: dict, cfg, data, device, tokenizer, only=Non
                         mf, mf.MultiModalClassifier, mm_kwargs, train_ds, val_loader,
                         cfg, device, "multimodal", algorithm=algo, alpha=alpha,
                         num_clients=5, rounds=tier["fed_rounds"],
-                        local_epochs=tier["local_epochs"], warm_start_state=warm_state,
+                        local_epochs=tier["local_epochs"], warm_start_state=None,
                         seed=seed, log_prefix=f"[{algo} a={alpha}] ")
                     store.put("E8_baselines", key, r)
 
@@ -1069,7 +1118,11 @@ def run_all(mf, store: Store, tier: dict, cfg, data, device, tokenizer, only=Non
                 store.put("E8_baselines", key, local_only_baseline(
                     mf, mf.MultiModalClassifier, mm_kwargs, train_ds, val_loader,
                     cfg, device, "multimodal", alpha=alpha, num_clients=5,
-                    epochs=max(4, tier["central_epochs"] // 2), seed=tier["seeds"][0]))
+                    # Match the cumulative local-epoch budget of federated
+                    # training; otherwise the local-only arm is undertrained by
+                    # 4x and exaggerates the benefit of federation.
+                    epochs=tier["fed_rounds"] * tier["local_epochs"],
+                    seed=tier["seeds"][0]))
 
 def run_rag_eval(mf, data, cfg, device, tokenizer, top_k: int = 5):
     """Index the training notes, query with every held-out validation note.
@@ -1176,7 +1229,8 @@ def main(base_py: str, tier: str = "standard", out: str = "results_v2.json",
     )
 
     out_path = Path(out)
-    cache_path = Path(cache) if cache else out_path.parent / f"data_cache_{tier}.pkl"
+    cache_path = (Path(cache) if cache else
+                  out_path.parent / f"data_cache_{tier}_controlled_v2.pkl")
     data = build_data(mf, cfg, cache_path)
     tokenizer = mf.get_text_tokenizer(t["text_model"], cfg.max_seq_length)
 
@@ -1187,6 +1241,10 @@ def main(base_py: str, tier: str = "standard", out: str = "results_v2.json",
         "device": str(device),
         "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
         "torch": torch.__version__,
+        "data_protocol": "controlled_v2_real4_synthetic_covid_template_text",
+        "fl_initialization": "public_pretrained_encoders_random_task_heads",
+        "training_precision": "fp32_tensors_no_amp",
+        "deterministic_algorithms_enforced": torch.are_deterministic_algorithms_enabled(),
         "n_train": len(data["train_texts"]), "n_val": len(data["val_texts"]),
     })
     store.flush()

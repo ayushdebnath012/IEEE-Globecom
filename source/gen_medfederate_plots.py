@@ -10,8 +10,8 @@ import matplotlib.gridspec as gridspec
 from matplotlib.colors import LinearSegmentedColormap
 from pathlib import Path
 
-RESULTS_PATH = Path(__file__).parent / "results" / "medfederate_results.json"
-PLOTS_DIR    = Path(__file__).parent.parent / "paper" / "omnimed_plots"
+RESULTS_PATH = Path("C:/Users/USER_HP/Desktop/FarmFederate/FarmFederate_Globecom/results/medfederate_results.json")
+PLOTS_DIR    = Path("C:/Users/USER_HP/Desktop/FarmFederate/FarmFederate_Globecom/medfederate_plots")
 PLOTS_DIR.mkdir(exist_ok=True)
 
 with open(RESULTS_PATH) as f:

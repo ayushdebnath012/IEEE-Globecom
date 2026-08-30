@@ -1,0 +1,20 @@
+\begin{table}[t]
+\caption{Retrieval evaluation over 600 held-out queries
+against a 2400-note index (top-$k$=5).}
+\label{tab:rag}
+\centering\footnotesize
+\setlength\tabcolsep{4pt}
+\begin{tabular}{lcccc}
+\toprule
+Condition & $n$ & Top-1 acc. & P@$k$ & Top-1 sim.\\
+\midrule
+Normal & 115 & 0.539 & 0.461 & 0.695\,$\pm$\,0.096 \\
+Pneumonia & 121 & 0.512 & 0.463 & 0.716\,$\pm$\,0.098 \\
+Covid19 & 128 & 0.531 & 0.442 & 0.715\,$\pm$\,0.090 \\
+Pleural Effusion & 126 & 0.484 & 0.465 & 0.705\,$\pm$\,0.090 \\
+Cardiomegaly & 110 & 0.545 & 0.478 & 0.703\,$\pm$\,0.079 \\
+\midrule
+\textbf{Overall} & 600 & \textbf{0.522} & -- & 0.707 \\
+\bottomrule
+\end{tabular}
+\end{table}
