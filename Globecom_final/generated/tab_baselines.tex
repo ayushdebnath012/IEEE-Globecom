@@ -1,0 +1,26 @@
+\begin{table}[t]
+\caption{Federated algorithms under \emph{matched} settings: same
+Concat-VLM backbone, data, partition, local budget and hyperparameters.
+Among federated rows, the update rule is the only variable; the local-only
+row is the no-federation reference. Federated rows are
+mean\,$\pm$\,std over seeds.}
+\label{tab:baselines}
+\centering\footnotesize
+\setlength\tabcolsep{5pt}
+\begin{tabular}{lc}
+\toprule
+\textbf{Method} & $\alpha=0.1$\\
+\midrule
+Local only (no federation) & 0.310 [0.064, 0.575] \\
+FedAvg & 0.652\,$\pm$\,0.057 \\
+FedProx & 0.685\,$\pm$\,0.064 \\
+SCAFFOLD-style (AdamW) & 0.192\,$\pm$\,0.129 \\
+\bottomrule
+\end{tabular}
+\vspace{1pt}
+
+{\scriptsize Local-only is the mean over the five clients, each trained on its
+own shard alone, evaluated at its final matched-budget epoch; brackets give
+the client range for that seed-0 partition. Every other
+row is the global model after $T$ rounds.}
+\end{table}

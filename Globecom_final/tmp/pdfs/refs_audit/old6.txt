@@ -1,0 +1,65 @@
+       OmniMed-FL: A Robust Multimodal Federated
+        Learning Framework for Clinical Diagnosis
+                                         1 Ayush Debnath, 2,3,4 Ruelia Saha, 2 Sudip Misra
+                                                1
+                                              Department of Mechanical Engineering
+                                     Indian Institute of Technology Kharagpur, India-721302
+                                         2
+                                           Computer Science & Engineering Department
+                                  IIT (Indian Institute of Technology) Kharagpur, India-721302
+                                    3
+                                      KTH Royal Institute of Technology, Stockholm, Sweden
+                                                    4
+                                                      SRM University- AP, India
+                      Email: {ayush.d@kgpian.iitkgp.ac.in, ruelia.saha.rs@gmail.com, sudipm@iitkgp.ac.in}
+
+
+   Abstract—Clinical diagnosis requires medical images and patient      HIPAA and GDPR restrict centralised collection of medical
+records together, yet most machine learning systems model one           records. Federated Learning (FL) offers a practical alternative:
+modality, and privacy rules such as HIPAA and GDPR block                institutions train a shared model through locally computed
+hospitals from pooling records centrally. We propose OmniMed-
+FL, a multi-modal federated learning framework for five-class           parameter updates without exchanging raw data. Most clinical
+clinical condition classification (Normal, Pneumonia, COVID-            FL methods, however, remain single-modality and ignore
+19, Pleural Effusion, Cardiomegaly). It benchmarks five LLM             the textual notes clinicians record alongside images [4]–[6].
+text encoders, five Vision Transformer (ViT) image encoders             Physicians draw on both sources, yet existing frameworks
+and eight VLM fusion strategies under FedAvg with non-IID               either pool sensitive data centrally or model images alone.
+Dirichlet(α=1.0) partitioning across 5 hospital clients. An anti-
+collapse stack of balanced batch sampling, entropy diversity            We therefore developed OmniMed-FL, a federated multimodal
+regularization and adaptive early abort prevents majority-class         framework that lets hospitals train on imaging and textual
+collapse: dips are transient and all 18 variants recover full five-     information together without exposing raw patient data.
+class diversity by epoch 5. DistilBERT reaches F1 0.934 on text,
+ViT-Base 0.664 on images, and Concat VLM fusion 0.956—a +2.2            A. Contribution
+point gain over the best unimodal baseline. Federated training            The main contributions of this paper are as follows:
+retains 99.1% of centralized Macro F1 averaged over the three
+branches: Fed-VLM (0.956) matches its centralized counterpart             • We study how combining medical images with electronic
+and Fed-LLM (0.953) exceeds its own (0.934), while the image-only           health records improves diagnosis in a federated setting;
+branch loses 4.8%. Against the 31 published systems compiled in             both modalities together outperform either alone.
+Table IV, Fed-VLM is the strongest federated entry and second             • We prepare a controlled clinical dataset in which similar
+overall behind a centralized EfficientNet-B7 (0.980), though those
+                                                                            information appears across disease classes, so the model
+systems use different corpora so the positioning is indicative only.
+A FAISS-indexed retrieval layer returns the correct condition as            cannot predict from a few obvious keywords and must
+its top-1 match for all five probe queries, at cosine similarities of       use both the image and the clinical record.
+0.66–0.85.                                                                • We evaluate OmniMed-FL under non-IID distributions
+   Index Terms—Multimodal Federated Learning, Vision-                       reflecting differences between participating hospitals,
+Language Models, Clinical Condition Classification, E-Health,
+                                                                            reaching performance close to centralized training while
+Privacy-Preserving AI, Vision Transformer
+                                                                            keeping patient data within each institution.
+                       I. I NTRODUCTION                                                      II. R ELATED W ORK
+      LINICAL condition classification—distinguishing normal            A. Medical Image Classification
+C     presentations from acute infections, fluid accumulation,
+and structural cardiac pathology—is central to timely patient
+                                                                           Early work treated radiology as an image classification
+                                                                        problem. Rajpurkar et al. [1] and Irvin et al. [2] showed
+intervention. Most automated diagnostic systems rely on a               the effectiveness of CNN-based chest X-ray classification in
+single data type: CNNs or vision transformers over chest                centralized settings; later work explored Vision Transform-
+radiographs [1], [2], or language models over electronic                ers [7], [8], which capture broader spatial relationships within
+health records. Neither is sufficient alone. Image-based models         an image. These approaches classify strongly but rely on
+overlook clinical context such as elevated BNP levels or a              centrally collected datasets and ignore the clinical notes that
+history of viral exposure; text-based models cannot capture             often accompany medical images.
+radiological findings such as bilateral ground-glass opacities
+or a pleural fluid meniscus.                                            B. Federated Clinical Learning
+   Deployment is further constrained because patient data is             FL has been studied as a way to train clinical models without
+spread across hospitals, clinics and diagnostic centres, while          moving patient data outside individual institutions. Sheller et
+

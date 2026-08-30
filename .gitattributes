@@ -8,3 +8,4 @@ experiments/omnimed_experiments.py          -text
 experiments/rag_retrieval_corrected.py      -text
 experiments/pfin_matched.py                 -text
 experiments/reviewer_completion.py          -text
+*.mp4 filter=lfs diff=lfs merge=lfs -text

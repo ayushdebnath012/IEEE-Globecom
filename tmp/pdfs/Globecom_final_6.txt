@@ -1,0 +1,400 @@
+       OmniMed-FL: A Robust Multimodal Federated
+        Learning Framework for Clinical Diagnosis
+                                         1 Ayush Debnath, 2,3,4 Ruelia Saha, 2 Sudip Misra
+                                                1
+                                              Department of Mechanical Engineering
+                                     Indian Institute of Technology Kharagpur, India-721302
+                                         2
+                                           Computer Science & Engineering Department
+                                  IIT (Indian Institute of Technology) Kharagpur, India-721302
+                                    3
+                                      KTH Royal Institute of Technology, Stockholm, Sweden
+                                                    4
+                                                      SRM University- AP, India
+                      Email: {ayush.d@kgpian.iitkgp.ac.in, ruelia.saha.rs@gmail.com, sudipm@iitkgp.ac.in}
+
+
+   Abstract—Clinical diagnosis requires medical images and patient      HIPAA and GDPR restrict centralised collection of medical
+records together, yet most machine learning systems model one           records. Federated Learning (FL) offers a practical alternative:
+modality, and privacy rules such as HIPAA and GDPR block                institutions train a shared model through locally computed
+hospitals from pooling records centrally. We propose OmniMed-
+FL, a multi-modal federated learning framework for five-class           parameter updates without exchanging raw data. Most clinical
+clinical condition classification (Normal, Pneumonia, COVID-            FL methods, however, remain single-modality and ignore
+19, Pleural Effusion, Cardiomegaly). It benchmarks five LLM             the textual notes clinicians record alongside images [4]–[6].
+text encoders, five Vision Transformer (ViT) image encoders             Physicians draw on both sources, yet existing frameworks
+and eight VLM fusion strategies under FedAvg with non-IID               either pool sensitive data centrally or model images alone.
+Dirichlet(α=1.0) partitioning across 5 hospital clients. An anti-
+collapse stack of balanced batch sampling, entropy diversity            We therefore developed OmniMed-FL, a federated multimodal
+regularization and adaptive early abort prevents majority-class         framework that lets hospitals train on imaging and textual
+collapse: dips are transient and all 18 variants recover full five-     information together without exposing raw patient data.
+class diversity by epoch 5. DistilBERT reaches F1 0.934 on text,
+ViT-Base 0.664 on images, and Concat VLM fusion 0.956—a +2.2            A. Contribution
+point gain over the best unimodal baseline. Federated training            The main contributions of this paper are as follows:
+retains 99.1% of centralized Macro F1 averaged over the three
+branches: Fed-VLM (0.956) matches its centralized counterpart             • We study how combining medical images with electronic
+and Fed-LLM (0.953) exceeds its own (0.934), while the image-only           health records improves diagnosis in a federated setting;
+branch loses 4.8%. Against the 31 published systems compiled in             both modalities together outperform either alone.
+Table IV, Fed-VLM is the strongest federated entry and second             • We prepare a controlled clinical dataset in which similar
+overall behind a centralized EfficientNet-B7 (0.980), though those
+                                                                            information appears across disease classes, so the model
+systems use different corpora so the positioning is indicative only.
+A FAISS-indexed retrieval layer returns the correct condition as            cannot predict from a few obvious keywords and must
+its top-1 match for all five probe queries, at cosine similarities of       use both the image and the clinical record.
+0.66–0.85.                                                                • We evaluate OmniMed-FL under non-IID distributions
+   Index Terms—Multimodal Federated Learning, Vision-                       reflecting differences between participating hospitals,
+Language Models, Clinical Condition Classification, E-Health,
+                                                                            reaching performance close to centralized training while
+Privacy-Preserving AI, Vision Transformer
+                                                                            keeping patient data within each institution.
+                       I. I NTRODUCTION                                                      II. R ELATED W ORK
+      LINICAL condition classification—distinguishing normal            A. Medical Image Classification
+C     presentations from acute infections, fluid accumulation,
+and structural cardiac pathology—is central to timely patient
+                                                                           Early work treated radiology as an image classification
+                                                                        problem. Rajpurkar et al. [1] and Irvin et al. [2] showed
+intervention. Most automated diagnostic systems rely on a               the effectiveness of CNN-based chest X-ray classification in
+single data type: CNNs or vision transformers over chest                centralized settings; later work explored Vision Transform-
+radiographs [1], [2], or language models over electronic                ers [7], [8], which capture broader spatial relationships within
+health records. Neither is sufficient alone. Image-based models         an image. These approaches classify strongly but rely on
+overlook clinical context such as elevated BNP levels or a              centrally collected datasets and ignore the clinical notes that
+history of viral exposure; text-based models cannot capture             often accompany medical images.
+radiological findings such as bilateral ground-glass opacities
+or a pleural fluid meniscus.                                            B. Federated Clinical Learning
+   Deployment is further constrained because patient data is             FL has been studied as a way to train clinical models without
+spread across hospitals, clinics and diagnostic centres, while          moving patient data outside individual institutions. Sheller et
+           TABLE I: Positioning vs. Related Work.                             Text Input                                                Image Input
+                                                                          Clinical Notes / EHR                                      Chest X-ray 224×224
+                                Modality     Framework
+                                                                               Tokenizer                                                  Resize
+          Work                 Img    Text   FL   VLM                          WordPiece                                                 Normalize
+                                                                                                                                                             FedAvg
+          CheXNet [1]           ✓      ×     ×      ×                       LLM Encoder
+                                                                         DistilBERT | BERT-tiny
+                                                                                                                                       ViT Encoder
+                                                                                                                                     ViT-Base | DeiT-tiny
+                                                                                                                                                               K=5
+                                                                                                                                                              hospitals
+          Sheller 2020 [4]      ✓      ×     ✓      ×                          BERT-mini | -                                        Swin-tiny | ConvNeXT    T =8 rounds
+          Kaissis 2021 [6]      ✓      ×     ✓      ×                        small | -medium                                            | EfficientNet
+          BiomedCLIP [9]        ✓      ✓     ×      ✓
+          MedCLIP [11]          ✓      ✓     ×      ✓                          ht ∈ R256                                                 hv ∈ R512
+
+
+          OmniMed-FL (ours)     ✓      ✓     ✓      ✓                                                     VLM Fusion
+                                                                                             Concat | Cross-Attn | Gated | CLIP |
+                                                                                            Flamingo | BLIP-2 | CoCa | Unified-IO
+
+al. [4] applied FedAvg in a decentralized medical imaging
+                                                                                                         Classification
+setting, Dou et al. [5] validated a federated model across                                               Head (5-class)
+                                                                                                    Focal loss + Diversity reg.
+national sites, and Kaissis et al. [6] added differential privacy.
+Most such approaches are built around a single modality and                                  Normal | Pneumonia | COVID-19
+                                                                                                  Pleural Effusion | Cardiomegaly
+consider medical images only.
+                                                                     Fig. 1: OmniMed-FL architecture. LLM and ViT encoders
+C. Vision-Language Models in Healthcare                              process clinical notes and chest X-rays; VLM fusion combines
+                                                                     both modalities; FedAvg coordinates K=5 hospital clients
+   Another line of work combines medical images with textual
+                                                                     without transmitting raw patient data.
+information. BiomedCLIP [9], LLaVA-Med [10] and Med-
+CLIP [11] learn relationships between medical images and their
+associated reports, using both modalities rather than treating
+the image independently. These models are generally trained
+centrally, which makes direct use across hospitals with isolated
+patient data difficult.
+   Synthesis: As summarized in Table I, existing work generally
+addresses either multimodal learning or decentralized training,
+and comparatively little combines both within one framework.
+OmniMed-FL addresses this gap by incorporating image–text            Fig. 2: Benchmark of 8 VLM fusion strategies. Simple
+fusion into a federated learning setup for clinical diagnosis.       Concatenation (Concat) and Gated Fusion provide the best
+                                                                     balance of Accuracy and Macro F1.
+                      III. S YSTEM D ESIGN
+A. Architecture                                                      four layers stay frozen and the rest are fine-tuned on the clinical
+                                                                     data, cutting trainable parameters while still adapting to medical
+   Figure 1 shows the overall OmniMed-FL pipeline. Clinical
+                                                                     terminology and task-specific patterns. The image branch uses
+notes are first tokenized using WordPiece with a maximum
+                                                                     ViT-Base/16: 12 layers, hidden size 768, 12 heads, ≈86 M
+sequence length of 128 tokens, while chest radiographs are
+                                                                     parameters. We selected it as the highest-scoring backbone in
+resized to 224×224 and normalized using ImageNet statistics.
+                                                                     Figure 3, though its margin over Swin-tiny (0.664 vs. 0.661) is
+The text encoder produces a feature vector ht ∈ R256 using the
+                                                                     small enough that the two should be treated as equivalent here;
+[CLS] representation, whereas the image encoder generates
+                                                                     the clear separation is between the attention-based backbones
+hv ∈ R512 using adaptive average pooling.
+                                                                     and the convolutional ones. Images are split into 16×16 token
+   The two feature representations are then combined in the
+                                                                     patches with a learnable [CLS] token prepended. For both
+VLM module. We evaluate eight fusion methods: Concatenation,
+                                                                     modalities a projection head maps the native hidden states to
+Cross-Attention, Gated Fusion, CLIP, Flamingo, BLIP-2, CoCa,
+                                                                     a shared latent space (d = 256 or 512) prior to concatenation
+and Unified-IO. Each produces a joint representation hf , passed
+                                                                     or cross-attention fusion.
+to a linear classifier for five-class prediction. We included both
+simple and attention-based methods to test whether the extra
+                                                                     C. Dataset and Clinical Corpus
+computation is justified in a federated hospital setting. As
+Figure 2 shows, seven of the eight fall within a 1.0-point              Image data. We aggregated public chest X-ray collections
+band (0.946–0.956) and all seven exceed the best unimodal            and mapped them to our five target conditions: the keremberke
+encoder, with plain concatenation highest. Since each variant        pneumonia dataset, Tawsifur’s COVID-19 image set, and the
+was run once, that spread is not a defensible ordering: the          NIH Chest X-ray dataset (filtered from 14 labels to our 5).
+benefit comes from having both modalities rather than from           Where a class lacked enough real samples we supplemented the
+the fusion operator, which favours the cheapest option. CoCa         training set with synthetic, X-ray-style images carrying specific
+(0.662) does not converge within this budget.                        pixel signatures—a bright lower-lobe patch for Pneumonia, a
+                                                                     basal opacity gradient for Pleural Effusion. All images are
+B. Encoding Specifications                                           ImageNet-normalized and stored as float16 tensors to halve
+  The text branch uses DistilBERT: 6 transformer layers,             memory use. The corpus is balanced at 600 samples per class,
+hidden size 768, 12 attention heads, ≈66 M parameters. The first     3,000 images total, split 80/20 for training and validation.
+                                                                           TABLE II: Global Hyperparameter Configuration.
+                                                                                     Parameter                Value
+                                                                                     Local Epochs (E)         5
+                                                                                     Federated Rounds (T )    8
+                                                                                     Batch Size               32
+                                                                                     LLM Learning Rate        2 × 10−5
+                                                                                     ViT Learning Rate        1 × 10−4
+                                                                                     Fusion Learning Rate     1 × 10−4
+                                                                                     Weight Decay             0.01
+                                                                                     Warmup Steps             100
+                                                                                     Diversity Reg. (λ)       0.1
+Fig. 3: Comparison of image backbones. The three attention-                          Dirichlet Alpha (α)      1.0
+                                                                                     Precision                FP16 (AMP)
+based backbones cluster at Macro F1 0.647–0.664; the two
+convolutional baselines fall to 0.32–0.34.                           TABLE III: Macro F1 Scores Across All 18 Evaluated Variants
+   Clinical text data. Because real EHR data is difficult to          Modality      Model Variants (Macro F1)                      Peak F1
+source publicly, a template engine generates 3,000 synthetic          LLM           BERT-tiny (0.786), BERT-mini (0.873),           0.934
+medical reports from vocabulary pools mapped to observations,         (text)        BERT-small (0.898), BERT-medium (0.911),
+                                                                                    DistilBERT (0.934)
+symptoms and conditions. A 75%/25% mixed-to-clear slot ratio
+                                                                      ViT           ConvNeXT-tiny (0.321), EfficientNet (0.338),    0.664
+reduces reliance on obvious keywords: mixed samples carry             (image)       DeiT-tiny (0.647), Swin-tiny (0.661),
+overlapping or cross-class phrasing, making the text less directly                  ViT-Base/16 (0.664)
+indicative of the target class and encouraging use of the full        VLM           CoCa (0.662), Gated (0.946), BLIP-2 (0.949),    0.956
+clinical context. All generated text is normalized and simulated      (fusion)      Unified-IO (0.950), Flamingo (0.951), CLIP
+patient identifiers removed. Templates keep the pathological                        (0.952), Cross-Attn (0.953), Concat (0.956)
+description consistent with the findings in the paired X-ray,
+giving a controlled setting for evaluating how effectively the       produces heterogeneous client class distributions—some clients
+fusion module combines the two modalities.                           hold more Pneumonia cases, others more Normal or other
+   What this corpus does and does not support. Because               classes—and lets us evaluate federated averaging when local
+cross-modal alignment is known by construction, every vari-          distributions differ. Note that α = 1.0 draws each client’s
+ant sees identical data and differences between variants are         class proportions uniformly from the probability simplex, a
+attributable to the variant. The corpus is not a substitute for      moderate rather than extreme heterogeneity setting: α → ∞
+clinical data, and it bounds what the numbers mean. Template         recovers the IID case and α ≪ 1 produces the regime in which
+notes draw on a smaller, more regular vocabulary than dictated       most clients see only one or two classes. It is the reference
+reports and reproduce none of their negation-scope errors,           value used in the federated visual classification literature [14];
+hedging, abbreviation drift or comorbidity structure; the images     results under smaller α are not reported here and are discussed
+used to top up under-represented classes are pixel-pattern           in Section III-J.
+surrogates, not radiographs. Both make the modalities more              Rationale for Table II. These values were fixed once and
+separable than they would be in practice, and asymmetrically         reused for all 18 variants, so no comparison is confounded
+so—the text branch benefits more—so the modality gap we              by per-model tuning. E=5, T =8 follows from Figure 5:
+report is very likely an upper bound on the real one, and            the model is within one point of its final Macro F1 by
+the absolute Macro F1 values are ceilings obtained under             round 3, so T =8 leaves margin past convergence while keeping
+favourable conditions. What the corpus does support are the          synchronizations—and the cost in Section III-H—small. The
+relative comparisons: across modalities, across fusion strategies,   rates differ by branch because 2×10−5 is the standard range for
+and between federated and centralized training.                      a pretrained BERT-family encoder while the ViT projection and
+                                                                     fusion head start from a task-agnostic or random init and need
+D. Experimental Setup                                                1×10−4 ; one rate for both under-trains the head. A batch of
+  Hyperparameters. Each client trains locally with AdamW,            32 is the largest holding both encoders at 224×224 in FP16 on
+using learning rate 2×10−5 for the language encoder and              one device and the smallest for which the balanced sampler can
+1×10−4 for both the ViT and the fusion head, with linear             place several examples of each class per batch, a precondition
+warmup over the first 10% of training iterations. Each client        for a usable diversity gradient. The λ range [0.01, 0.5] brackets
+performs five local epochs (E = 5) before sending updated pa-        the regimes where the entropy term is negligible against the
+rameters to the server for aggregation. The diversity-regularizer    focal loss and where it dominates.
+coefficient is λ = 0.1, set by grid search over 0.01 to 0.5. All        Anti-collapse analysis. Before examining federated training
+experiments use PyTorch 2.4 on NVIDIA A100 GPUs with                 behaviour we compare all 18 model variants. Table III reports
+Automatic Mixed Precision (AMP). Table II gives the complete         the best Macro F1 obtained by the individual text and image
+configuration.                                                       models and by the multimodal variants. The VLM-based models
+  Partitioning. To represent differences in data distributions       outperform the standalone text and image branches, showing
+across hospitals, we divide the dataset among clients with a         the benefit of combining both modalities.
+Dirichlet non-IID partition at concentration α = 1.0, which             We then study behaviour over the course of federated training.
+Figure 4 shows per-epoch class diversity: a transient dip              TABLE IV: OmniMed-FL vs. Published Work (Representative
+followed by full recovery, common to all three families. Fifteen       Selection).
+of the 18 variants drop below full diversity in the first three             System                                           F1        FL      Year
+epochs—deepest at 0.40 for CoCa in epoch 2, with the LLM                    EfficientNet-B7 (COVID CXR)‡                    0.980      ×       2020
+and ViT families bottoming out at 0.60—and every variant                    OmniMed-FL Fed-VLM (ours)                       0.956      ✓       2026
+returns to full five-class diversity by epoch 5 and holds it. No            OmniMed-FL Concat VLM (ours)                    0.956      ×       2026
+                                                                            COVID-Net [12]                                  0.913      ×       2020
+variant settles into predicting a single majority class, the failure        BiomedCLIP [9]                                  0.912      ×       2023
+mode that non-IID federated training on an imbalanced label                 CheXNet [1]                                     0.910      ×       2017
+                                                                            LLaVA-Med [10]                                  0.894      ×       2023
+space invites. The anti-collapse stack is active in every run, so           MedCLIP [11]                                    0.880      ×       2022
+these curves show that collapse does not occur under the stack;             Swin-CXR [8]                                    0.875      ×       2021
+                                                                            Sheller et al. [4]                              0.852      ✓       2020
+they do not isolate the contribution of its three components,               Kaissis et al. [6]                              0.840      ✓       2021
+and we do not infer it. Figure 7 reports the modality ablation              Dou et al. [5]                                  0.825      ✓       2021
+our runs do support.                                                        SCAFFOLD [13]                                   0.760      ✓       2020
+                                                                            FedAvg [3]                                      0.720      ✓       2017
+E. Benchmark Comparison                                                FL = federated learning used. OmniMed-FL ranks #2 of 31 compared. Scores are those
+                                                                        each system’s own authors report on their own corpora and are not head-to-head with
+   Table IV positions OmniMed-FL against existing literature.              ours. ‡ Highest centralized entry in the survey; single-source COVID-19 corpus.
+Fed-VLM achieves Macro F1 0.956, second among the 31
+                                                                       an accuracy mechanism; five queries over a synthetic corpus
+systems considered; the highest is an EfficientNet-B7 at F 1 =
+                                                                       settle nothing either way. Nothing here constitutes evidence of
+0.980, trained on a large centralized COVID-19 dataset. Among
+                                                                       clinical utility: the system has not been evaluated on patient
+federated approaches, Fed-VLM gives the best performance
+                                                                       data, against radiologist readings, or prospectively, and these
+in our comparison. Every entry is the score its own authors
+                                                                       results are a systems-level feasibility study for multimodal
+report on their own corpus, and none was retrained on our
+                                                                       federated training rather than a diagnostic performance claim.
+data, so this is a positioning exercise rather than a controlled
+benchmark and the gaps are not measured improvements. The              G. Discussion and Deployment Efficiency
+structural point is not subject to that caveat: no surveyed system
+                                                                          The text-based models outperform the vision-only models.
+combines image–text fusion with federated training.
+                                                                       One likely reason is that clinical reports contain explicit
+   A further aspect is the gap with respect to centralized training.
+                                                                       descriptions of symptoms and diagnostic findings, whereas
+OmniMed-FL retains 99.1% of the centralized Macro F1 under
+                                                                       the same information must be inferred from more complex
+the non-IID partition used here, and Figure 7 summarizes the
+                                                                       visual patterns in an X-ray. Combining the two modalities
+best result for each modality alongside its federated counterpart.
+                                                                       improves overall performance, with the best VLM configuration
+   The convergence curves in Figure 5 also separate the
+                                                                       reaching F1 0.956. Figure 6 shows the training and validation
+unimodal from the multimodal models. Fed-VLM is at 0.9532
+                                                                       trajectories of the fusion strategies; the curves converge stably
+by round 1 against a final 0.9564—99.7% of its end state—and
+                                                                       without severe overfitting.
+stays within a 0.005 band thereafter, because both encoders
+                                                                          Deployment is also practical. Because we opted for relatively
+enter federation pretrained. The image-only branch does not
+                                                                       lightweight encoders (DistilBERT and ViT-Base), standard
+improve with more rounds; it drifts down from 0.675 to 0.632,
+                                                                       hospital workstations complete local training rounds in minutes,
+dipping to 0.583 at round 5. One explanation is that the textual
+                                                                       so smaller rural clinics need no large GPU cluster to participate.
+branch provides a strong pretrained representation early, helping
+                                                                       Because raw patient data stays where it was collected and only
+the fused model reach a useful solution faster than the image-
+                                                                       parameter updates cross the network, the framework removes
+only branch.
+                                                                       the need for a central data repository—the regulatory obstacle
+F. Retrieval-Augmented Generation (RAG) Pipeline                       the design targets.
+   To enhance diagnostic interpretability, a FAISS-powered             H. Communication Cost and Scalability
+Retrieval-Augmented Generation (RAG) pipeline provides
+evidence-based clinical context for predictions. While the                OmniMed-FL carries two encoders, so its communication
+VLM head outputs the diagnosis, the RAG module works                   footprint is worth stating. Under FedAvg each client exchanges
+in the background as a decision-support tool: our fine-tuned           the full trainable parameter vector twice per round, giving a
+DistilBERT encoder indexes anonymized historical cases and             total volume
+clinical guidelines, and each patient’s fused query vector hf                                  V = 2 K T |θ| b,                    (1)
+is searched against that index. Figure 8 breaks down query             with K clients, T rounds, |θ| parameters and b bytes each. V is
+correctness and the retrieval score distribution. On this five-        linear in K and T and independent of how much data a hospital
+query probe the top-1 neighbour carries the correct condition          holds, so federating a large site costs no more than a small
+label for all five queries, at cosine similarities of 0.797,           one. Table V instantiates (1) at K=5, T =8, b=4—AMP sets
+0.853, 0.675, 0.820 and 0.665. Retrieval did not improve               compute precision, but aggregated master weights stay FP32,
+classification—raw and retrieval-augmented each answer 3 of 5          so the payload is not halved. Fed-VLM transmits 586 MiB
+correctly—so we present it as an interpretability affordance, not      per client per round against 253 MiB for text-only: 2.3×
+Fig. 4: Per-epoch class diversity (fraction of 5 classes predicted): LLM (left), ViT (centre), VLM (right), with the anti-collapse
+stack active in all runs. All three families dip transiently in the first epochs—deepest at 0.40 for CoCa, 0.60 for the LLM and
+ViT families—and all 18 variants recover full five-class diversity by epoch 5 and hold it.
+                                                                     TABLE V: Analytic communication cost per branch, from (1)
+                                                                     at K=5, T =8, FP32 master weights. Payload is per client
+                                                                     per round; V is the full run, both directions. Freezing four
+                                                                     DistilBERT layers cuts Fed-VLM to 101.5 M / 387 MiB /
+                                                                     30.3 GiB at unchanged F1.
+                                                                        Branch                  |θ|     Payload   Total V   Macro F1
+                                                                        Fed-LLM (DistilBERT) 66.4 M     253 MiB 19.8 GiB     0.953
+                                                                        Fed-ViT (ViT-Base/16)  86.6 M   330 MiB 25.8 GiB     0.632
+                                                                        Fed-VLM (Concat)      153.6 M   586 MiB 45.8 GiB     0.956
+
+Fig. 5: Federated convergence over T =8 rounds. Fed-VLM              Our α=1.0 result shows drift is not harmful at moderate
+reaches 99.7% of its final Macro F1 by round 1 and Fed-              heterogeneity but says nothing about smaller α—and the image-
+LLM plateaus by round 5, while the image-only branch drifts          only branch already degrades across rounds (Figure 5), the
+from 0.675 to 0.632. Accuracy tracks Macro F1 within 0.005           drift signature the fused model resists. Participation: every
+throughout and is omitted.                                           result assumes all K clients complete every round, so dropout,
+                                                                     stragglers, heterogeneous hardware and poisoned updates are
+the communication for +2.2 Macro F1 points, a deployment             untested; FedAvg’s weighted mean offers no defence against
+trade-off rather than an unambiguous win. Quantization, top-         the last.
+k sparsification and low-rank adapters apply unchanged but
+are not evaluated. These figures are analytic, from parameter        I. Security and Data Governance
+counts, not measured on a testbed.                                      OmniMed-FL addresses privacy at several levels. X-rays and
+   Scalability. Each client’s payload is independent of K, but       EHR notes never leave the host clinic, so no raw record is
+the server absorbs K|θ|b per round—2.9 GiB at K=5 and                exposed in transit, and weight updates are encrypted on the
+11.4 GiB at K=20 for Fed-VLM—so the aggregator, not the              wire; as a fail-safe, all text passes through a local scrubbing
+client link, is the first bottleneck, and round latency is set by    routine that deletes Protected Health Information (PHI) before
+the slowest participant. Statistically the pressure runs the other   it reaches the tokenizer. This is the standard FedAvg trust
+way: for a fixed corpus, larger K shrinks each local shard,          model, not a privacy guarantee: updates are a function of the
+making updates noisier and leaving the balanced sampler fewer        local data, and inversion attacks can recover training examples
+examples per class. The two effects must trade off at some           from them [15]. We train without differential privacy and report
+K; every result here uses K=5 and we have not located that           no privacy budget, run no membership-inference evaluation,
+point.                                                               and have exercised the scrubbing pass only on synthetic text;
+   Robustness. Two exposures follow from choosing FedAvg.            a deployment would need formal DP accounting and secure
+Client drift: FedAvg applies no correction for divergence            aggregation.
+between local optima, which FedProx and SCAFFOLD [13]
+target and either could replace the aggregation step here.           J. Limitations
+                                                                       These are internally controlled comparisons on one corpus;
+                                                                     we state what they do not support. Data: as set out in
+                                                                     Section III-C, the corpus is partly synthetic, so no result is
+                                                                     reproduced on real paired image–report data and the absolute
+                                                                     values are ceilings; the task is also single-label, whereas real
+                                                                     corpora are multi-label. Coverage: every result uses K=5,
+Fig. 6: Training and validation curves for the evaluated VLM         T =8, α=1.0 and one seed, so we have not swept α into
+fusion variants.                                                     the severe regime (α ≤ 0.5), varied K, added stragglers, or
+Fig. 7: Ablations. (a) Original modality comparison. (b) Validated anti-collapse component ablation at severe and mild heterogeneity;
+bars show mean±std over two seeds. (c) Validated early-abort and initialization controls; diamonds mark round-1 F1. The
+pooled-data oracle is diagnostic only.
+
+                                                                      Future work will test the framework on real multi-institutional
+                                                                    radiology pairs and integrate formal differential privacy auditing
+                                                                    and asynchronous aggregation toward live clinical deployment.
+                                                                    The results here are a well-controlled observation on one
+                                                                    benchmark rather than a general one, and Section III-J sets out
+                                                                    what would be needed to generalize them.
+                                                                                               V. ACKNOWLEDGEMENT
+                                                                      The work reported in this paper was done as part of the
+Fig. 8: RAG pipeline evaluation: query correctness (top) and        INAE Chair Professorship grant received by the third author.
+score distribution
+                                                                                                         R EFERENCES
+estimated variance—and the 1.0-point spread among the top             [1] P. Rajpurkar, J. Irvin, K. Zhu, et al., “CheXNet: Radiologist-level pneumonia
+seven fusion strategies is within reordering range. Ablation              detection on chest X-rays with deep learning,” arXiv:1711.05225, 2017.
+                                                                      [2] J. Irvin, P. Rajpurkar, M. Ko, et al., “CheXpert: A large chest radiograph dataset
+scope: Figure 7 ablates modality and federation, which our                with uncertainty labels and expert comparison,” in Proc. AAAI Conf. Artificial
+runs support; it does not decompose the anti-collapse stack,              Intelligence, 2019, pp. 590–597.
+                                                                      [3] B. McMahan, E. Moore, D. Ramage, S. Hampson, and B. A. y Arcas,
+whose components are always enabled together, nor quantify                “Communication-efficient learning of deep networks from decentralized data,” in
+warm-start or retrieval. Prior work and cost: Table IV reports            Proc. Int. Conf. Artificial Intelligence and Statistics (AISTATS), 2017, pp. 1273–
+                                                                          1282.
+numbers from other corpora, so we claim no matched-condition          [4] M. J. Sheller, B. Edwards, G. A. Reina, et al., “Federated learning in medicine:
+improvement over any prior method, and Table V is analytic,               facilitating multi-institutional collaborations without sharing patient data,” Scientific
+                                                                          Reports, vol. 10, art. 12598, 2020.
+so wall-clock, peak memory and scaling in K are unmeasured            [5] Q. Dou, T. Y. So, M. Jiang, et al., “Federated deep learning for detecting COVID-19
+and no hardware-deployability claim follows.                              lung abnormalities in CT: a privacy-preserving multinational validation study,” npj
+                                                                          Digital Medicine, vol. 4, art. 60, 2021.
+                                                                      [6] G. Kaissis, A. Ziller, J. Passerat-Palmbach, et al., “End-to-end privacy preserving
+                      IV. C ONCLUSION                                     deep learning on multi-institutional medical imaging,” Nature Machine Intelligence,
+                                                                          vol. 3, pp. 473–484, 2021.
+   We presented OmniMed-FL, a multimodal federated learning           [7] A. Dosovitskiy, L. Beyer, A. Kolesnikov, et al., “An image is worth 16×16
+benchmark covering 18 model variants for five-class clinical              words: Transformers for image recognition at scale,” in Proc. Int. Conf. Learning
+                                                                          Representations (ICLR), 2021.
+condition classification. DistilBERT leads among text encoders        [8] Z. Liu, Y. Lin, Y. Cao, et al., “Swin Transformer: Hierarchical vision transformer
+at F1 = 0.934, ViT-Base among vision encoders at F1 = 0.664,              using shifted windows,” in Proc. IEEE/CVF Int. Conf. Computer Vision (ICCV),
+                                                                          2021, pp. 10012–10022.
+and Concat VLM fusion reaches the best overall F1 = 0.956—a           [9] S. Zhang, Y. Xu, N. Usuyama, et al., “BiomedCLIP: A multimodal biomedical
++2.2 point gain over the best text model and +29.1 points                 foundation model pretrained from fifteen million scientific image-text pairs,”
+                                                                          arXiv:2303.00915, 2023.
+over the best vision model. The anti-collapse training stack         [10] C. Li, C. Wong, S. Zhang, et al., “LLaVA-Med: Training a large language-and-
+holds five-class prediction diversity at 100% for all LLM and             vision assistant for biomedicine in one day,” in Advances in Neural Information
+                                                                          Processing Systems (NeurIPS), Datasets and Benchmarks Track, 2023.
+VLM variants throughout training. Federated training retains         [11] Z. Wang, Z. Wu, D. Agarwal, and J. Sun, “MedCLIP: Contrastive learning from
+99.1% of centralized accuracy under Dirichlet(α=1.0) non-IID              unpaired medical images and text,” in Proc. Conf. Empirical Methods in Natural
+                                                                          Language Processing (EMNLP), 2022, pp. 3876–3887.
+partitioning across K=5 hospital clients: Fed-VLM matches its        [12] L. Wang, Z. Q. Lin, and A. Wong, “COVID-Net: A tailored deep convolutional
+centralized counterpart to within +0.1% and Fed-LLM exceeds               neural network design for detection of COVID-19 cases from chest X-ray images,”
+                                                                          Scientific Reports, vol. 10, art. 19549, 2020.
+its own by +2.0%, while the image-only branch gives up 4.8%.         [13] S. P. Karimireddy, S. Kale, M. Mohri, et al., “SCAFFOLD: Stochastic controlled
+The above-100% retention of the text branch is most plausibly a           averaging for federated learning,” in Proc. Int. Conf. Machine Learning (ICML),
+                                                                          2020, pp. 5132–5143.
+regularization effect of averaging over five heterogeneous local     [14] T.-M. H. Hsu, H. Qi, and M. Brown, “Measuring the effects of non-identical data
+optima, not a benefit of decentralization. Since both sides use           distribution for federated visual classification,” arXiv:1909.06335, 2019.
+                                                                     [15] M. Abadi, A. Chu, I. Goodfellow, et al., “Deep learning with differential privacy,”
+identical data, architectures and hyperparameters, the privacy            in Proc. ACM SIGSAC Conf. Computer and Communications Security (CCS), 2016,
+constraint is close to free for the multimodal model on this              pp. 308–318.
+benchmark.
+

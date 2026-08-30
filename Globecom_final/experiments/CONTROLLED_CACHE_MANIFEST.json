@@ -1,0 +1,26 @@
+{
+  "remote_path": "/home/trishita/omnimed/data_cache_standard_controlled.pkl",
+  "size_bytes": 905003098,
+  "sha256": "4286565db7ff817f6cca0894479b7c1f8836fa73aa09407fd906634dbb0969ba",
+  "total_examples": 3000,
+  "train_examples": 2400,
+  "validation_examples": 600,
+  "class_counts": {
+    "Normal": 600,
+    "Pneumonia": 600,
+    "COVID-19": 600,
+    "Pleural Effusion": 600,
+    "Cardiomegaly": 600
+  },
+  "image_sources": {
+    "public_radiographs": 2400,
+    "synthetic_covid_surrogates": 600
+  },
+  "text_sources": {
+    "synthetic_class_conditioned_templates": 3000,
+    "unique_texts": 2995
+  },
+  "image_text_label_mismatches": 0,
+  "pairing": "class-level, not patient-level",
+  "verified_on_server": true
+}

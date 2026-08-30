@@ -1,0 +1,517 @@
+\documentclass[letterpaper, conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+% Strict margin enforcement and text wrapping
+\usepackage[letterpaper, top=0.75in, bottom=1in, left=0.625in, right=0.625in]{geometry}
+\usepackage{microtype}
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{url}
+\usepackage{subcaption}
+\usepackage{caption}
+\usepackage{placeins}
+\usepackage{colortbl}
+\usepackage{balance}
+% \usepackage{stfloats}  % not installed in all TeX distributions; no [b] figure* is used
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,shapes.geometric,positioning,fit,backgrounds,calc}
+
+\definecolor{llmblue}   {RGB}{76,114,176}
+\definecolor{vitgreen}  {RGB}{85,168,104}
+\definecolor{vlmred}    {RGB}{196,78,82}
+\definecolor{fedorange} {RGB}{204,185,116}
+\definecolor{fedpurple} {RGB}{129,114,178}
+\definecolor{outyyellow}{RGB}{255,242,204}
+\definecolor{smallgray} {RGB}{220,220,220}
+
+\graphicspath{{omnimed_plots/}}
+
+\tikzset{
+  mainbox/.style={draw, rounded corners=4pt, align=center,
+                  minimum height=0.75cm, text width=#1,
+                  font=\footnotesize, inner sep=4pt},
+  mainbox/.default=2.4cm,
+  llmbox/.style ={mainbox, fill=llmblue!30,  draw=llmblue!80!black},
+  vitbox/.style ={mainbox, fill=vitgreen!30, draw=vitgreen!80!black},
+  vlmbox/.style ={mainbox=5.2cm, fill=vlmred!25, draw=vlmred!80!black,
+                  minimum height=1.0cm},
+  fedbox/.style ={mainbox=1.9cm, fill=fedpurple!40, draw=fedpurple!80!black},
+  outbox/.style ={mainbox=4.5cm, fill=outyyellow, draw=yellow!70!black},
+  sbox/.style   ={draw, rounded corners=2pt, fill=smallgray,
+                  minimum height=0.5cm, align=center,
+                  font=\scriptsize, inner sep=3pt, text width=1.8cm},
+  arr/.style    ={-{Stealth[length=5pt]}, thick},
+  darr/.style   ={-{Stealth[length=5pt]}, thick, dashed},
+}
+
+\begin{document}
+\renewcommand{\arraystretch}{0.85}
+\setlength{\abovecaptionskip}{0pt}
+\setlength{\belowcaptionskip}{0pt}
+
+\setlength{\columnsep}{0.25in}
+
+\renewcommand{\dbltopfraction}{0.9}
+\renewcommand{\topfraction}{0.9}
+
+\title{OmniMed-FL: A Controlled Multimodal Federated Learning Study for Clinical Classification}
+
+\author{
+\IEEEauthorblockN{$^1$Ayush Debnath, $^{2,3,4}$Ruelia Saha, $^{2}$Sudip Misra}
+
+\IEEEauthorblockA{$^1$Department of Mechanical Engineering\\
+Indian Institute of Technology Kharagpur, India-721302}
+
+\IEEEauthorblockA{$^2$Computer Science \& Engineering Department\\
+IIT (Indian Institute of Technology) Kharagpur, India-721302}
+
+\IEEEauthorblockA{$^3$KTH Royal Institute of Technology, Stockholm, Sweden}
+
+\IEEEauthorblockA{$^4$SRM University- AP, India}
+
+Email: \{ayush.d@kgpian.iitkgp.ac.in, ruelia.saha.rs@gmail.com, sudipm@iitkgp.ac.in\}
+}
+
+\maketitle
+
+\begin{abstract}
+We present OmniMed-FL, a controlled multimodal federated-learning study for
+five-class image--text classification. The proxy corpus contains 2,400 public
+chest radiographs, 600 synthetic COVID-19 image surrogates, and 3,000
+class-conditioned synthetic notes; modalities are paired by class rather than by
+patient. Public DistilBERT and ViT-Base/16 encoders are fine-tuned from random task
+heads without pooled-data pretraining in the operational protocol. We vary
+Dirichlet heterogeneity, client count, anti-collapse components, initialization,
+eight fusion rules in a pooled-data diagnostic screen, and the federated update
+rule. Runtime and peak allocated GPU
+memory are observed, whereas FP32 communication is calculated from trainable
+parameters. Across two seeds, FedAvg Macro F1 changes from
+$0.896\!\pm\!0.004$ at $\alpha{=}5$ to $0.674\!\pm\!0.185$ at
+$\alpha{=}0.1$, exposing substantial sensitivity to the realized client
+partition. Because the text is templated, one image class is synthetic, and no
+patient-level pairing is available, these are proxy systems comparisons rather
+than estimates of clinical performance, privacy, or deployment readiness. At
+$\alpha{=}0.1$, the matched Table~IV results are local-only 0.310 (five-client
+mean), FedAvg $0.652\!\pm\!0.057$, FedProx
+$0.685\!\pm\!0.064$, and SCAFFOLD-style AdamW
+$0.192\!\pm\!0.129$. Thus FedAvg and FedProx outperform isolated local training,
+while the AdamW control-variate adaptation is unstable; the 0.033 FedProx--FedAvg
+gap is descriptive rather than statistically resolved.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Multimodal Federated Learning, Non-IID Data, Vision-Language Models, Clinical Classification, Communication Cost, Retrieval
+\end{IEEEkeywords}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Introduction}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\IEEEPARstart{C}{linical} prediction often draws on both images and textual
+context. Centralized image models~\cite{Rajpurkar2017,Irvin2019} and medical
+vision--language models can combine these signals, but cross-institutional
+training would ordinarily require data to leave its source. Federated learning
+(FL) instead exchanges parameter updates while retaining each client's raw
+examples~\cite{McMahan2017}. This data-locality property is useful, although FL
+alone is not a privacy guarantee and does not remove risks from model updates.
+
+Federated medical imaging~\cite{Sheller2020,Dou2021,Kaissis2021} and centralized
+medical vision--language modeling have mature precedents, with recent work also
+studying their intersection. The combination still raises questions that a single favorable run cannot answer:
+how performance changes with client skew, whether anti-collapse components help,
+whether fusion rankings survive seed variation, and what additional memory and
+communication the multimodal branch incurs.
+
+We study these questions through OmniMed-FL, a controlled five-class proxy
+benchmark. Its public radiographs and synthetic clinical-style notes are not
+patient-matched data, so the work evaluates the learning system rather than
+clinical diagnosis. This scope permits reproducible matched comparisons while
+making the boundary between a systems result and a clinical claim explicit.
+
+
+\subsection{Contribution}
+The main \textit{contributions} of this paper are as follows:
+\begin{itemize}
+\item We implement a reproducible multimodal FL protocol that begins from public
+pretrained encoders and random task heads, never from a model trained on pooled
+client examples.
+\item We evaluate data heterogeneity, client count, anti-collapse components,
+initialization, eight fusion rules, and matched FedAvg/FedProx/SCAFFOLD-style
+baselines with repeated seeds.
+\item We report realized client skew, wall-clock time, peak allocated GPU memory
+and FP32 communication payload, and evaluate retrieval over the full held-out
+split rather than a five-query demonstration.
+\end{itemize}
+
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Related Work}
+
+\subsection{Medical Image Classification}
+Early work on automated diagnosis mainly treated radiology as an image classification problem. Rajpurkar \textit{et al.}~\cite{Rajpurkar2017} and Irvin \textit{et al.}~\cite{Irvin2019} showed the effectiveness of CNN-based models for chest X-ray classification in centralized settings. Later work explored Vision Transformers~\cite{Dosovitskiy2021,Liu2021swin}, which capture broader spatial relationships within an image. Although these approaches achieve strong classification performance, they generally rely on centrally collected datasets and do not make use of the clinical notes that often accompany medical images.
+
+\subsection{Federated Clinical Learning}
+Federated Learning (FL) has been studied as a way to train clinical models without moving patient data outside individual institutions. Sheller \textit{et al.}~\cite{Sheller2020} applied FedAvg in a decentralized medical imaging setting and Dou \textit{et al.}~\cite{Dou2021} validated a federated model across national sites, while Kaissis \textit{et al.}~\cite{Kaissis2021} considered additional privacy protection through differential privacy. FedProx~\cite{Li2020fedprox} and SCAFFOLD~\cite{Karimireddy2020} address optimization under heterogeneous clients through a proximal objective and control variates, respectively. Most clinical studies nevertheless remain image-only, motivating our matched multimodal comparison.
+
+\subsection{Vision-Language Models in Healthcare}
+Another line of work has focused on combining medical images with textual information. Models such as BiomedCLIP~\cite{Zhang2023biomedclip}, LLaVA-Med~\cite{Li2023llavamed}, and MedCLIP~\cite{Wang2022medclip} learn relationships between medical images and associated reports or clinical text. This allows the model to use information from both modalities rather than treating the image independently. However, these models are generally developed and trained in centralized settings, which makes their direct use across hospitals with isolated patient data difficult.
+
+\textbf{Synthesis:}
+The intersection is no longer empty. FedMME uses a vision-language model to
+generate reports for a one-shot federated ensemble~\cite{Wang2025fedmme}, while
+P-FIN studies uncertainty-aware imputation and aggregation when clinical sites
+have missing modalities~\cite{Shahid2026pfin}. These systems address different
+problems and data regimes, so cross-paper scores are not comparable. Our narrower
+contribution is a controlled multi-round study of image--text fusion, partition
+heterogeneity, anti-collapse components, and matched update rules; we make no
+priority or state-of-the-art claim.
+
+
+\begin{table}[t]
+\caption{Positioning vs.\ Related Work.}
+\label{tab:relwork}
+\centering\footnotesize
+\setlength\tabcolsep{6pt}
+\begin{tabular}{lcccc}
+\toprule
+ & \multicolumn{2}{c}{\textbf{Modality}} & \multicolumn{2}{c}{\textbf{Framework}}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+\textbf{Work} & \textbf{Img} & \textbf{Text} & \textbf{FL} & \textbf{VLM}\\
+\midrule
+CheXNet~\cite{Rajpurkar2017}       & \checkmark & $\times$ & $\times$ & $\times$ \\
+Sheller 2020~\cite{Sheller2020}    & \checkmark & $\times$ & \checkmark & $\times$ \\
+Kaissis 2021~\cite{Kaissis2021}    & \checkmark & $\times$ & \checkmark & $\times$ \\
+BiomedCLIP~\cite{Zhang2023biomedclip} & \checkmark & \checkmark & $\times$ & \checkmark \\
+ MedCLIP~\cite{Wang2022medclip}     & \checkmark & \checkmark & $\times$ & \checkmark \\
+ FedMME~\cite{Wang2025fedmme}       & \checkmark & \checkmark & \checkmark & \checkmark \\
+\midrule
+\rowcolor{vlmred!20}
+\textbf{OmniMed-FL (ours)}         & \checkmark & \checkmark & \checkmark & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{System Design}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Architecture}
+
+Figure~\ref{fig:arch} shows the OmniMed-FL pipeline. Clinical-style notes are
+tokenized with WordPiece to 128 tokens; chest images are resized to
+$224{\times}224$ and ImageNet-normalized. DistilBERT's \texttt{[CLS]}
+representation is projected to $\mathbf{h}_t\!\in\!\mathbb{R}^{256}$, while the
+mean-pooled ViT token sequence is projected to
+$\mathbf{h}_v\!\in\!\mathbb{R}^{512}$.
+
+The two representations are combined by eight lightweight operators:
+384-dimensional concatenation, residual cross-attention, a gated residual,
+256-dimensional dual-projection concatenation, two registry variants with the
+same decoder-layer parameterization, non-residual 384-dimensional
+cross-attention, and a two-token Transformer encoder. Historical code keys refer
+to several vision--language model families, but these operators are not
+implementations of those foundation models. Each produces $\mathbf{h}_f$, which
+is passed to a two-layer five-class MLP classifier.
+
+We include simple and more complex fusion rules to test whether additional
+attention structure produces a repeatable benefit under the same training budget.
+The repeated-seed comparison is a pooled-data diagnostic architecture screen
+reported in Section~\ref{sec:results}, not an operational FL result; we do not
+infer an ordering from the earlier single-run screening plot.
+
+
+\begin{figure}[t]
+\centering
+\resizebox{0.98\columnwidth}{!}{%
+\begin{tikzpicture}[node distance=0.45cm]
+  \node[llmbox] (ti)  {Text Input\\[-1pt]{\scriptsize Template clinical-style note}};
+  \node[sbox, below=0.28cm of ti] (tok) {Tokenizer\\WordPiece};
+  \node[llmbox, below=0.28cm of tok, text width=2.8cm, minimum height=1.0cm]
+        (llm) {Text Encoder\\[-2pt]{\scriptsize DistilBERT}};
+  \node[font=\scriptsize, below=0.18cm of llm] (ht)
+        {$\mathbf{h}_t\!\in\!\mathbb{R}^{256}$};
+
+  \node[vitbox, right=3.4cm of ti] (ii) {Image Input\\[-1pt]
+                                         {\scriptsize Chest X-ray $224{\times}224$}};
+  \node[sbox, below=0.28cm of ii] (aug) {Resize\\Normalize};
+  \node[vitbox, below=0.28cm of aug, text width=2.8cm, minimum height=1.0cm]
+        (vit) {Image Encoder\\[-2pt]{\scriptsize ViT-Base/16}};
+  \node[font=\scriptsize, below=0.18cm of vit] (hv)
+        {$\mathbf{h}_v\!\in\!\mathbb{R}^{512}$};
+
+  \node[fedbox, right=0.9cm of vit, yshift=0.3cm, minimum height=1.4cm,
+        text width=2.0cm] (fed)
+        {FedAvg\\[-1pt]{\scriptsize $K{=}5$ clients\\$T{=}8$ rounds}};
+
+  \node[vlmbox, below=1.0cm of llm, xshift=3.1cm, minimum height=0.95cm]
+        (vlm) {VLM Fusion\\[-2pt]
+               {\scriptsize Concat $|$ Cross-Attn $|$ Gated $|$ Dual-Proj $|$
+               Decoder A/B $|$ Cross-Attn-384 $|$ Token Encoder}};
+
+  \node[mainbox=3.2cm, fill=vlmred!40, draw=vlmred,
+        below=0.35cm of vlm] (cls)
+        {Classification Head (5-class)\\[-1pt]
+         {\scriptsize Focal loss + Diversity reg.}};
+
+  \node[outbox, below=0.35cm of cls] (out)
+        {Normal $|$ Pneumonia $|$ COVID-19\\[-2pt]
+         {\scriptsize Pleural Effusion $|$ Cardiomegaly}};
+
+  \draw[arr](ti)--(tok);\draw[arr](tok)--(llm);\draw[arr](ii)--(aug);
+  \draw[arr](aug)--(vit);\draw[arr](llm)--(ht);\draw[arr](vit)--(hv);
+  \draw[arr](ht.south)--++(0,-0.15)-|(vlm.north west);
+  \draw[darr](hv.south)--++(0,-0.15)-|(vlm.north east);
+  \draw[arr](vlm)--(cls);\draw[arr](cls)--(out);
+  \draw[darr](fed.west)--(vit.east);
+\end{tikzpicture}%
+}
+\caption{OmniMed-FL architecture. DistilBERT and ViT-Base/16 encode the two
+proxy modalities; VLM fusion combines them; FedAvg coordinates simulated
+clients without transmitting their raw examples.}
+\label{fig:arch}
+\end{figure}
+
+\subsection{Encoding Specifications}
+The text branch uses the public DistilBERT checkpoint~\cite{Sanh2019}, with six
+transformer layers and a 768-dimensional hidden state. The image branch uses the
+public ViT-Base/16 checkpoint~\cite{Dosovitskiy2021}, with 12 transformer layers,
+a 768-dimensional hidden state and $16{\times}16$ input patches. Both pretrained
+encoders are fine-tuned locally. Projection layers map their representations to
+the fusion-specific latent size, and the operational federated protocol starts
+with these public encoder weights and randomly initialized projection, fusion and
+classification heads. No model trained on pooled client data initializes an
+operational FL run. The unimodal classifier heads and inactive CNN fallback are
+excluded from VLM optimization and communication because they are not on the
+fusion path.
+
+\subsection{Dataset and Clinical Corpus}
+
+\textbf{Image data.}
+We form a balanced 3,000-image proxy corpus (600 examples per class). The public
+radiographs come from the Kermany pneumonia collection~\cite{Kermany2018} and the
+NIH ChestX-ray dataset~\cite{Wang2017chestxray8}. Loader logs verify 2,400 public
+images covering Normal, Pneumonia, Pleural Effusion and Cardiomegaly. The named
+COVID-19 source was unavailable at execution time, so the 600 COVID-19 images are
+synthetic X-ray-style surrogates with bilateral opacity patterns. Images are
+resized to $224{\times}224$, normalized with ImageNet statistics, shuffled
+deterministically and split 80/20 into 2,400 training and 600 validation examples.
+
+\textbf{Clinical text data.}
+No patient EHR data are used. Each image label is paired at the class level with a
+synthetic clinical-style note generated from observation, symptom, context and
+indicator slots. Twenty-five percent of notes draw all slots from the target
+class, 35\% mix target and non-target slots, and 40\% are heavily mixed while
+retaining a probabilistic target-class indicator. This controlled construction
+reduces direct label wording, but the image and note are not from the same patient
+and must not be described as a real image--report pair.
+
+\label{sec:corpus}
+\textbf{What this corpus does and does not support.}
+Every experimental arm sees the same controlled corpus, so matched comparisons
+between federated algorithms, fusion rules and ablations are meaningful within
+this benchmark. The absolute scores are not diagnostic-performance estimates:
+one image class is synthetic, all text is templated, pairing is label-level, and
+the split is not patient-grouped across source institutions. We therefore make no
+claim about clinical utility, deployment readiness or generalization to real
+paired radiology reports.
+
+\subsection{Experimental Setup}
+
+\textbf{Hyperparameters.}
+Each client uses AdamW with learning rate $10^{-4}$ and weight decay $0.01$ for
+three local epochs per round. The reviewer suite uses eight rounds, batch size 16,
+FP32 tensors without automatic mixed precision, and diversity-loss weight 1.0. The reference setting is five
+clients with Dirichlet $\alpha=1.0$; Sections~\ref{sec:results}--\ref{sec:cost}
+vary $\alpha$ and the number of clients explicitly. Seeds 0 and 1 jointly control
+task-head initialization and the realized client partition. Experiments run in
+PyTorch on NVIDIA H100 NVL GPUs shared with unrelated workloads; wall-clock
+measurements therefore include uncontrolled contention. CUDA deterministic
+algorithms are not forced, so the seeds control software RNG streams but do not
+guarantee bitwise-identical reruns. Table~\ref{tab:hyper} records the fixed protocol.
+
+\textbf{Partitioning.}
+For each class, a Dirichlet draw allocates training indices across clients.
+Smaller $\alpha$ creates more concentrated client label distributions;
+$\alpha\!\to\!\infty$ approaches IID allocation~\cite{Hsu2019}. Because nominal $\alpha$ does
+not fully describe a finite realized split, we also report the mean client share
+occupied by its dominant class. The same split is held fixed across rounds for a
+given seed.
+
+\textbf{Rationale for Table~\ref{tab:hyper}.}
+The values are fixed across matched arms; only the factor named by an ablation or
+sweep changes. Three local epochs and eight rounds provide a 24-local-epoch budget
+while keeping the full sweep tractable. Batch size 16 holds both active encoders
+and a local model copy in memory. The $10^{-4}$ rate and diversity weight 1.0 are
+the implemented defaults rather than outcomes of per-model tuning. Consequently,
+we interpret comparisons within the grid and do not claim each configuration is
+individually optimal.
+
+\begin{table}[t]
+\caption{Global Hyperparameter Configuration.}
+\label{tab:hyper}
+\centering\footnotesize
+\begin{tabular}{ll}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Local Epochs ($E$) & 3 \\
+Federated Rounds ($T$) & 8 \\
+Batch Size & 16 \\
+AdamW Learning Rate & $1 \times 10^{-4}$ \\
+Weight Decay & $0.01$ \\
+Diversity Reg. ($\lambda$) & 1.0 \\
+Reference $K$, $\alpha$ & 5, 1.0 \\
+Seeds & 0, 1 \\
+Initialization & Public encoders + random heads \\
+Precision & FP32 tensors (no AMP) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\input{results_corrected.tex}
+
+
+\FloatBarrier
+\bibliographystyle{IEEEtran}
+\let\oldbibliography\thebibliography
+\renewcommand{\thebibliography}[1]{%
+  \oldbibliography{#1}%
+  \scriptsize
+  \setlength{\itemsep}{0pt}%
+  \setlength{\parskip}{0pt}%
+  \setlength{\topsep}{0pt}%
+}
+
+\section{Acknowledgement}
+The work reported in this paper was done as part of the INAE Chair Professorship grant received by the third author.
+
+\balance
+\begin{thebibliography}{99}
+
+\bibitem{Rajpurkar2017}
+P.~Rajpurkar, J.~Irvin, K.~Zhu, B.~Yang, H.~Mehta, T.~Duan, D.~Ding, A.~Bagul,
+C.~Langlotz, K.~Shpanskaya, M.~P. Lungren, and A.~Y. Ng,
+``CheXNet: Radiologist-level pneumonia detection on chest X-rays with deep learning,''
+\emph{arXiv:1711.05225}, 2017.
+
+\bibitem{Irvin2019}
+J.~Irvin, P.~Rajpurkar, M.~Ko, Y.~Yu, S.~Ciurea-Ilcus, C.~Chute, H.~Marklund, et~al.,
+``CheXpert: A large chest radiograph dataset with uncertainty labels and expert comparison,''
+in \emph{Proc. AAAI Conf. Artificial Intelligence}, 2019, pp.~590--597.
+
+\bibitem{McMahan2017}
+B.~McMahan, E.~Moore, D.~Ramage, S.~Hampson, and B.~A. y~Arcas,
+``Communication-efficient learning of deep networks from decentralized data,''
+in \emph{Proc. Int. Conf. Artificial Intelligence and Statistics (AISTATS)}, 2017,
+pp.~1273--1282.
+
+\bibitem{Sheller2020}
+M.~J. Sheller, B.~Edwards, G.~A. Reina, J.~Martin, S.~Pati, A.~Kotrotsou,
+M.~Milchenko, et~al.,
+``Federated learning in medicine: facilitating multi-institutional collaborations
+without sharing patient data,''
+\emph{Scientific Reports}, vol.~10, art.~12598, 2020.
+
+\bibitem{Dou2021}
+Q.~Dou, T.~Y. So, M.~Jiang, Q.~Liu, V.~Vardhanabhuti, G.~Kaissis, Z.~Li, et~al.,
+``Federated deep learning for detecting COVID-19 lung abnormalities in CT: a
+privacy-preserving multinational validation study,''
+\emph{npj Digital Medicine}, vol.~4, art.~60, 2021.
+
+\bibitem{Kaissis2021}
+G.~Kaissis, A.~Ziller, J.~Passerat-Palmbach, T.~Ryffel, D.~Usynin, A.~Trask, et~al.,
+``End-to-end privacy preserving deep learning on multi-institutional medical imaging,''
+\emph{Nature Machine Intelligence}, vol.~3, pp.~473--484, 2021.
+
+\bibitem{Dosovitskiy2021}
+A.~Dosovitskiy, L.~Beyer, A.~Kolesnikov, D.~Weissenborn, X.~Zhai, T.~Unterthiner, et~al.,
+``An image is worth 16$\times$16 words: Transformers for image recognition at scale,''
+in \emph{Proc. Int. Conf. Learning Representations (ICLR)}, 2021.
+
+\bibitem{Liu2021swin}
+Z.~Liu, Y.~Lin, Y.~Cao, H.~Hu, Y.~Wei, Z.~Zhang, S.~Lin, and B.~Guo,
+``Swin Transformer: Hierarchical vision transformer using shifted windows,''
+in \emph{Proc. IEEE/CVF Int. Conf. Computer Vision (ICCV)}, 2021, pp.~10012--10022.
+
+\bibitem{Zhang2023biomedclip}
+S.~Zhang, Y.~Xu, N.~Usuyama, H.~Xu, J.~Bagga, R.~Tinn, S.~Preston, et~al.,
+``BiomedCLIP: A multimodal biomedical foundation model pretrained from fifteen
+million scientific image-text pairs,'' \emph{arXiv:2303.00915}, 2023.
+
+\bibitem{Li2023llavamed}
+C.~Li, C.~Wong, S.~Zhang, N.~Usuyama, H.~Liu, J.~Yang, T.~Naumann, H.~Poon, and J.~Gao,
+``LLaVA-Med: Training a large language-and-vision assistant for biomedicine in one day,''
+in \emph{Advances in Neural Information Processing Systems (NeurIPS), Datasets and
+Benchmarks Track}, 2023.
+
+\bibitem{Wang2022medclip}
+Z.~Wang, Z.~Wu, D.~Agarwal, and J.~Sun,
+``MedCLIP: Contrastive learning from unpaired medical images and text,''
+in \emph{Proc. Conf. Empirical Methods in Natural Language Processing (EMNLP)},
+2022, pp.~3876--3887.
+
+\bibitem{Karimireddy2020}
+S.~P. Karimireddy, S.~Kale, M.~Mohri, S.~J. Reddi, S.~U. Stich, and A.~T. Suresh,
+``SCAFFOLD: Stochastic controlled averaging for federated learning,''
+in \emph{Proc. Int. Conf. Machine Learning (ICML)}, 2020, pp.~5132--5143.
+
+\bibitem{Hsu2019}
+T.-M. H. Hsu, H.~Qi, and M.~Brown,
+``Measuring the effects of non-identical data distribution for federated visual
+classification,'' \emph{arXiv:1909.06335}, 2019.
+
+\bibitem{Abadi2016}
+M.~Abadi, A.~Chu, I.~Goodfellow, H.~B. McMahan, I.~Mironov, K.~Talwar, and L.~Zhang,
+``Deep learning with differential privacy,''
+in \emph{Proc. ACM SIGSAC Conf. Computer and Communications Security (CCS)}, 2016,
+pp.~308--318.
+
+\bibitem{Kermany2018}
+D.~S. Kermany, M.~Goldbaum, W.~Cai, C.~C.~S. Valentim, H.~Liang, S.~L. Baxter,
+et~al., ``Identifying medical diagnoses and treatable diseases by image-based
+deep learning,'' \emph{Cell}, vol.~172, no.~5, pp.~1122--1131.e9, 2018.
+
+\bibitem{Wang2017chestxray8}
+X.~Wang, Y.~Peng, L.~Lu, Z.~Lu, M.~Bagheri, and R.~M. Summers,
+``ChestX-ray8: Hospital-scale chest X-ray database and benchmarks on
+weakly-supervised classification and localization of common thorax diseases,''
+in \emph{Proc. IEEE Conf. Computer Vision and Pattern Recognition (CVPR)}, 2017,
+pp.~2097--2106.
+
+\bibitem{Sanh2019}
+V.~Sanh, L.~Debut, J.~Chaumond, and T.~Wolf,
+``DistilBERT, a distilled version of BERT: Smaller, faster, cheaper and
+lighter,'' \emph{arXiv:1910.01108}, 2019.
+
+\bibitem{Li2020fedprox}
+T.~Li, A.~K. Sahu, M.~Zaheer, M.~Sanjabi, A.~Talwalkar, and V.~Smith,
+``Federated optimization in heterogeneous networks,'' in \emph{Proc. Mach.
+Learn. Syst. (MLSys)}, vol.~2, 2020.
+
+\bibitem{Johnson2019faiss}
+J.~Johnson, M.~Douze, and H.~J\'egou, ``Billion-scale similarity search with
+GPUs,'' \emph{IEEE Trans. Big Data}, vol.~7, no.~3, pp.~535--547, 2019.
+
+\bibitem{Wang2025fedmme}
+N.~Wang, Y.~Deng, S.~Fan, J.~Yin, and S.-K. Ng, ``Multi-modal one-shot
+federated ensemble learning for medical data with vision large language
+model,'' \emph{arXiv:2501.03292}, 2025.
+
+\bibitem{Shahid2026pfin}
+N.~F. Shahid, M.~Ahmed, M.~A. Haider, S.~R. Sagor, A.~Rahman, and M.~A.
+Hossain, ``Probabilistic feature imputation and uncertainty-aware multimodal
+federated aggregation,'' in \emph{Proc. Medical Imaging with Deep Learning
+(MIDL)}, PMLR, vol.~315, pp.~3593--3607, 2026.
+
+\end{thebibliography}
+
+\end{document}
