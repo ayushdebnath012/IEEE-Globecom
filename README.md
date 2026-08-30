@@ -94,18 +94,28 @@ you prefer.
 
 | File | |
 |---|---|
-| `METHODOLOGY_AUDIT.md` | what invalidated the earlier runs, and which chunks are eligible |
-| `validate_results.py` | the conflict check the merged artifact has to pass |
+| `METHODOLOGY_AUDIT.md` | what invalidated the earlier runs, which chunks are eligible, and the provenance chain |
+| `validate_results.py` | the record-count, key-set and protocol check for the corrected artifact |
 | `results_corrected_merged.json` | the validated artifact, SHA-256 recorded in the audit |
-| `reviewer_results_merged.json` | the merge the manuscript's numbers come from |
+| `reviewer_results_merged.json` | the later merge the manuscript's numbers come from |
+| `corrected_rag_retrieval.json` | corrected retrieval results, pinned by hash from the merge |
+| `reviewer_completion.py`, `rag_retrieval_corrected.py`, `pfin_matched.py` | the runners, pinned by hash from the merge |
 | `make_*.py` | regenerate each audited figure in `paper/generated/` |
 
-`results_corrected_merged.json` hashes to the SHA-256 written down in
-`METHODOLOGY_AUDIT.md`, so the audited set can be checked rather than taken on trust:
+Two artifacts, linked by hash. `results_corrected_merged.json` is the audited base
+and hashes to the SHA-256 written down in `METHODOLOGY_AUDIT.md`:
 
 ```sh
 sha256sum experiments/results_corrected_merged.json
 ```
+
+`reviewer_results_merged.json` is the later merge that adds the reviewer-completion
+runs, and is what the manuscript reports from. It uses a different schema, so
+`validate_results.py` does not apply to it — instead its `_meta` pins its parent and
+every runner by SHA-256. `METHODOLOGY_AUDIT.md` tabulates that chain and gives a
+snippet that checks all of it; every hash resolves to a file committed here except
+one superseded runner revision. The audited set is therefore the parent of the
+reported set, and the code that produced the numbers is the code in this directory.
 
 ## Notes
 

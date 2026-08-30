@@ -1,0 +1,10 @@
+# Artifacts whose SHA-256 is recorded in experiments/METHODOLOGY_AUDIT.md and in
+# reviewer_results_merged.json's _meta. Git must not rewrite their line endings:
+# any conversion changes the bytes and breaks the recorded hashes on checkout.
+experiments/results_corrected_merged.json   -text
+experiments/reviewer_results_merged.json    -text
+experiments/corrected_rag_retrieval.json    -text
+experiments/omnimed_experiments.py          -text
+experiments/rag_retrieval_corrected.py      -text
+experiments/pfin_matched.py                 -text
+experiments/reviewer_completion.py          -text

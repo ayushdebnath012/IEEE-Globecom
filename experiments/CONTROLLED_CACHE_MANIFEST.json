@@ -1,5 +1,5 @@
 {
-  "remote_path": "/home/trishita/omnimed/data_cache_standard_controlled.pkl",
+  "remote_path": "<compute-server>/omnimed/data_cache_standard_controlled.pkl",
   "size_bytes": 905003098,
   "sha256": "4286565db7ff817f6cca0894479b7c1f8836fa73aa09407fd906634dbb0969ba",
   "total_examples": 3000,

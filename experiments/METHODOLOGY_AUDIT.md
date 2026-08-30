@@ -145,3 +145,57 @@ python validate_results.py results_corrected_merged.json
 python omnimed_make_tables.py --results results_corrected_merged.json \
   --outdir ../generated
 ```
+
+## Provenance of the manuscript's result set
+
+The sections above audit `results_corrected_merged.json`. The manuscript does not
+read that file directly: it reports from `reviewer_results_merged.json`, the later
+merge that adds the reviewer-completion runs. The two are linked by hash rather
+than by shared schema, so the chain is worth stating explicitly.
+
+`reviewer_results_merged.json` reorganizes records into different top-level groups
+(`grid`, `federated_fusion`, `legacy_*`, `pfin_missing_text`, `retrieval`, …).
+**`validate_results.py` does not apply to it** and will fail on its schema; that
+check validates the earlier artifact only. Its `_meta` carries the provenance
+instead, pinning its parent and every runner by SHA-256:
+
+| `_meta` field | Artifact in this directory | Verified |
+|---|---|---|
+| `legacy_sha256` | `results_corrected_merged.json` | matches |
+| `corrected_retrieval_sha256` | `corrected_rag_retrieval.json` | matches |
+| `core_runner_sha256` | `omnimed_experiments.py` | matches |
+| `retrieval_runner_sha256` | `rag_retrieval_corrected.py` | matches |
+| `pfin_helper_sha256` | `pfin_matched.py` | matches |
+| `reviewer_runner_sha256_native_budget` | `reviewer_completion.py` | matches |
+| `reviewer_runner_sha256` | superseded runner revision | not retained |
+
+`legacy_sha256` is the same digest this document records for the validated
+artifact, so the audited set is the parent of the set the manuscript reports.
+Every hash above except the superseded reviewer-runner revision resolves to a file
+committed here, and each can be checked directly:
+
+```sh
+python - <<'PY'
+import json, hashlib
+m = json.load(open('reviewer_results_merged.json', encoding='utf8'))['_meta']
+for field, path in [
+        ('legacy_sha256', 'results_corrected_merged.json'),
+        ('corrected_retrieval_sha256', 'corrected_rag_retrieval.json'),
+        ('core_runner_sha256', 'omnimed_experiments.py'),
+        ('retrieval_runner_sha256', 'rag_retrieval_corrected.py'),
+        ('pfin_helper_sha256', 'pfin_matched.py'),
+        ('reviewer_runner_sha256_native_budget', 'reviewer_completion.py')]:
+    got = hashlib.sha256(open(path, 'rb').read()).hexdigest()
+    print(f"{'ok ' if got == m[field] else 'BAD'} {path}")
+PY
+```
+
+What this does and does not establish: it establishes that the manuscript's
+numbers descend from the audited artifact and that the code which produced them is
+the code committed here. It is not a substitute for `validate_results.py` — the
+record-count, key-set, and protocol invariants that check the earlier artifact have
+no equivalent for the newer schema. The `_meta` flags
+`legacy_meta_and_protocol_validated`, `new_record_protocols_validated`,
+`corrected_retrieval_protocol_validated`, and
+`grid_model_state_invariants_validated` are assertions written by the merge step,
+not independent checks.
