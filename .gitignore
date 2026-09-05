@@ -28,3 +28,6 @@ paper_assets.zip
 .env
 credentials*.json
 kaggle.json
+
+# macOS
+.DS_Store
