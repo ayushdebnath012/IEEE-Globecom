@@ -1,0 +1,19 @@
+\begin{table}[t]
+\caption{Scalability in the number of clients $K$ at $\alpha{=}1.0$.
+Communication is computed from the FP32 trainable-parameter payload,
+$V=2KT|\theta|b$; wall-clock is observed on a contended shared server.
+Mean\,$\pm$\,std over seeds.}
+\label{tab:clients}
+\centering\footnotesize
+\setlength\tabcolsep{5pt}
+\begin{tabular}{lccc}
+\toprule
+$K$ & Macro F1 & Wall-clock (s) & Total comm. (GiB)\\
+\midrule
+3 & 0.812\,$\pm$\,0.043 & 545 & 27.5 \\
+5 & 0.825\,$\pm$\,0.082 & 708 & 45.9 \\
+10 & 0.863\,$\pm$\,0.008 & 893 & 91.8 \\
+20 & 0.846\,$\pm$\,0.004 & 908 & 183.5 \\
+\bottomrule
+\end{tabular}
+\end{table}

@@ -1,0 +1,20 @@
+\begin{table}[t]
+\caption{Anti-collapse component ablation on Fed-VLM. Each row removes one
+component from the full stack. Diversity is the minimum fraction of the five
+classes predicted in any round. Mean\,$\pm$\,std over seeds.}
+\label{tab:anticollapse}
+\centering\footnotesize
+\setlength\tabcolsep{4pt}
+\begin{tabular}{lcccc}
+\toprule
+ & \multicolumn{2}{c}{$\alpha=0.1$} & \multicolumn{2}{c}{$\alpha=1.0$}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Configuration & F1 & Div. & F1 & Div.\\
+\midrule
+Full stack & 0.716\,$\pm$\,0.014 & 0.80 & 0.821\,$\pm$\,0.043 & 1.00 \\
+$-$ balanced sampler & 0.585\,$\pm$\,0.148 & 0.70 & 0.809\,$\pm$\,0.064 & 1.00 \\
+$-$ diversity term & 0.701\,$\pm$\,0.011 & 0.70 & 0.834\,$\pm$\,0.043 & 1.00 \\
+$-$ both & 0.657\,$\pm$\,0.057 & 0.60 & 0.823\,$\pm$\,0.073 & 0.90 \\
+\bottomrule
+\end{tabular}
+\end{table}

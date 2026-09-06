@@ -1,0 +1,58 @@
+# Only the paper, research code, results, and repository configuration belong here.
+# Other project materials stay local, including drafts, admin files and videos.
+/*
+!/.gitignore
+!/.gitattributes
+!/.github/
+!/README.md
+!/paper/
+!/experiments/
+!/source/
+
+# LaTeX build artefacts
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.bbl
+*.blg
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# experiment outputs (regenerate by running the suite)
+results_v2.json
+results_smoke.json
+warmstart_concat.pt
+data_cache_*.pkl
+paper_assets/
+paper_assets.zip
+
+# never commit these
+*.pem
+*.key
+.env
+credentials*.json
+kaggle.json
+
+# macOS
+.DS_Store
+
+# Local caches, model checkpoints, and temporary exports
+.venv/
+venv/
+.ipynb_checkpoints/
+.pytest_cache/
+tmp/
+*.pt
+*.pth
+*.ckpt
+*.pkl
+*.faiss
+*.zip
+*.mp4

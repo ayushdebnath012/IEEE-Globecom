@@ -1,0 +1,66 @@
+{
+  "task": "fedmme",
+  "key": "fedmme_style|alpha=0.1|K=5|seed=0",
+  "parameters": {
+    "seed": 0,
+    "alpha": 0.1,
+    "clients": 5,
+    "fusion": null,
+    "init_mode": null,
+    "pfin_mode": null,
+    "deterministic": false
+  },
+  "protocol": {
+    "rounds": 1,
+    "local_epochs": 24,
+    "communication_schedule": "one upload per independently trained client model",
+    "batch_size": 16,
+    "learning_rate": 0.0001,
+    "precision": "FP32",
+    "initialization": "public encoders + random task heads",
+    "data": "controlled_v2_real4_synthetic_covid_template_text"
+  },
+  "provenance": {
+    "base_model_sha256": "ce473f4bca58f8920d7c22b55b3e0dd28a2de227049f4ad77141659468cbf227",
+    "core_runner_sha256": "1805c5bafb5f4889ecab87fe16e3e16788d5e0d1c7d205f19c88f81555f420e4",
+    "reviewer_runner_sha256": "cdb9382800a3a21ee3665d0690e8591531c9c7ad8b3e9667427226b55dee4c9c",
+    "pfin_helper_sha256": "d95f2f41331fa6fe86fc2837a86148075ffbd5329db6b18b87e0cbd7c698a896",
+    "data_cache_sha256": "4286565db7ff817f6cca0894479b7c1f8836fa73aa09407fd906634dbb0969ba",
+    "torch": "2.11.0+cu128",
+    "gpu": "NVIDIA H100 NVL",
+    "deterministic_algorithms_enforced": false
+  },
+  "result": {
+    "f1": 0.6903843868613648,
+    "accuracy": 0.7,
+    "diversity": 1.0,
+    "per_client_f1": [
+      0.5767214056498884,
+      0.07032967032967033,
+      0.06433566433566433,
+      0.4204031649102071,
+      0.4313323619880201
+    ],
+    "client_sizes": [
+      690,
+      33,
+      359,
+      84,
+      1234
+    ],
+    "local_epochs": 24,
+    "ensemble": "equal hard plurality; mean-softmax tie break",
+    "upload_bytes_per_client": 615742484,
+    "total_comm_bytes_bidirectional": 6157424840,
+    "total_comm_bytes_upload_only": 3078712420,
+    "wall_seconds": 664.7887501581572,
+    "per_client_seconds": [
+      191.37834096932784,
+      13.207601534202695,
+      101.54100138088688,
+      24.81564632197842,
+      333.84615995176136
+    ],
+    "peak_mib": 4304.8369140625
+  }
+}

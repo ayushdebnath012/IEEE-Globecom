@@ -1,0 +1,143 @@
+{
+  "task": "fusion",
+  "key": "fusion=flamingo|alpha=0.1|K=5|seed=1",
+  "parameters": {
+    "seed": 1,
+    "alpha": 0.1,
+    "clients": 5,
+    "fusion": "flamingo",
+    "init_mode": null,
+    "pfin_mode": null,
+    "deterministic": false
+  },
+  "protocol": {
+    "rounds": 8,
+    "local_epochs": 3,
+    "communication_schedule": "one download and upload per client per round",
+    "batch_size": 16,
+    "learning_rate": 0.0001,
+    "precision": "FP32",
+    "initialization": "public encoders + random task heads",
+    "data": "controlled_v2_real4_synthetic_covid_template_text"
+  },
+  "provenance": {
+    "base_model_sha256": "ce473f4bca58f8920d7c22b55b3e0dd28a2de227049f4ad77141659468cbf227",
+    "core_runner_sha256": "1805c5bafb5f4889ecab87fe16e3e16788d5e0d1c7d205f19c88f81555f420e4",
+    "reviewer_runner_sha256": "cdb9382800a3a21ee3665d0690e8591531c9c7ad8b3e9667427226b55dee4c9c",
+    "pfin_helper_sha256": "d95f2f41331fa6fe86fc2837a86148075ffbd5329db6b18b87e0cbd7c698a896",
+    "data_cache_sha256": "4286565db7ff817f6cca0894479b7c1f8836fa73aa09407fd906634dbb0969ba",
+    "torch": "2.11.0+cu128",
+    "gpu": "NVIDIA H100 NVL",
+    "deterministic_algorithms_enforced": false
+  },
+  "result": {
+    "f1": 0.8088119775905988,
+    "accuracy": 0.8116666666666666,
+    "diversity": 1.0,
+    "history": {
+      "round_f1": [
+        0.2517922119517123,
+        0.7376514661719258,
+        0.766624500232105,
+        0.8015884641112537,
+        0.7522867359611592,
+        0.7894149683373812,
+        0.7510690748321982,
+        0.8088119775905988
+      ],
+      "round_acc": [
+        0.335,
+        0.7366666666666667,
+        0.7683333333333333,
+        0.8,
+        0.7566666666666667,
+        0.795,
+        0.7633333333333333,
+        0.8116666666666666
+      ],
+      "round_div": [
+        0.8,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "round_seconds": [
+        158.467591162771,
+        151.3267784351483,
+        158.5477148690261,
+        179.67578820837662,
+        214.36163968686014,
+        218.4988380097784,
+        245.67663177195936,
+        247.47129538375884
+      ],
+      "round_peak_mib": [
+        4903.697265625,
+        4905.166015625,
+        4912.369140625,
+        4910.962890625,
+        4910.80615234375,
+        4909.025390625,
+        4912.02490234375,
+        4909.650390625
+      ]
+    },
+    "client_sizes": [
+      352,
+      901,
+      920,
+      168,
+      59
+    ],
+    "client_class_hist": [
+      [
+        0,
+        10,
+        342,
+        0,
+        0
+      ],
+      [
+        0,
+        429,
+        0,
+        472,
+        0
+      ],
+      [
+        484,
+        0,
+        0,
+        0,
+        436
+      ],
+      [
+        0,
+        38,
+        129,
+        0,
+        1
+      ],
+      [
+        1,
+        2,
+        1,
+        2,
+        53
+      ]
+    ],
+    "upload_bytes_per_client_per_round": 617456660,
+    "total_comm_bytes": 49396532800,
+    "trainable_params": 154364165,
+    "total_params": 155215375,
+    "wall_seconds": 1574.0262775276788,
+    "peak_mib": 4912.369140625,
+    "nominal_clients": 5,
+    "active_clients": 5,
+    "skipped_client_ids": []
+  }
+}

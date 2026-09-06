@@ -1,0 +1,263 @@
+{
+  "task": "grid",
+  "key": "alpha=0.1|K=20|seed=0",
+  "parameters": {
+    "seed": 0,
+    "alpha": 0.1,
+    "clients": 20,
+    "fusion": null,
+    "init_mode": null,
+    "pfin_mode": null,
+    "deterministic": false
+  },
+  "protocol": {
+    "rounds": 8,
+    "local_epochs": 3,
+    "communication_schedule": "one download and upload per client per round",
+    "batch_size": 16,
+    "learning_rate": 0.0001,
+    "precision": "FP32",
+    "initialization": "public encoders + random task heads",
+    "data": "controlled_v2_real4_synthetic_covid_template_text"
+  },
+  "provenance": {
+    "base_model_sha256": "ce473f4bca58f8920d7c22b55b3e0dd28a2de227049f4ad77141659468cbf227",
+    "core_runner_sha256": "1805c5bafb5f4889ecab87fe16e3e16788d5e0d1c7d205f19c88f81555f420e4",
+    "reviewer_runner_sha256": "cdb9382800a3a21ee3665d0690e8591531c9c7ad8b3e9667427226b55dee4c9c",
+    "pfin_helper_sha256": "d95f2f41331fa6fe86fc2837a86148075ffbd5329db6b18b87e0cbd7c698a896",
+    "data_cache_sha256": "4286565db7ff817f6cca0894479b7c1f8836fa73aa09407fd906634dbb0969ba",
+    "torch": "2.11.0+cu128",
+    "gpu": "NVIDIA H100 NVL",
+    "deterministic_algorithms_enforced": false
+  },
+  "result": {
+    "f1": 0.7868741919183951,
+    "accuracy": 0.7883333333333333,
+    "diversity": 1.0,
+    "history": {
+      "round_f1": [
+        0.5526880299886947,
+        0.616865572953081,
+        0.6983724764913687,
+        0.7664726663860701,
+        0.7804383867110494,
+        0.762698556345615,
+        0.7562192968036092,
+        0.7868741919183951
+      ],
+      "round_acc": [
+        0.62,
+        0.6516666666666666,
+        0.71,
+        0.77,
+        0.7866666666666666,
+        0.7666666666666667,
+        0.765,
+        0.7883333333333333
+      ],
+      "round_div": [
+        0.8,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "round_seconds": [
+        54.49070300301537,
+        53.86978422384709,
+        52.10292998794466,
+        51.67753366706893,
+        54.247494116891176,
+        54.986601397860795,
+        52.08325146185234,
+        53.28867836529389
+      ],
+      "round_peak_mib": [
+        4909.0234375,
+        4905.5078125,
+        4909.1953125,
+        4902.5703125,
+        4904.9765625,
+        4907.5859375,
+        4905.1953125,
+        4908.5859375
+      ]
+    },
+    "client_sizes": [
+      295,
+      39,
+      5,
+      30,
+      128,
+      345,
+      41,
+      73,
+      21,
+      12,
+      78,
+      5,
+      152,
+      199,
+      5,
+      430,
+      176,
+      100,
+      167,
+      99
+    ],
+    "client_class_hist": [
+      [
+        162,
+        0,
+        0,
+        0,
+        133
+      ],
+      [
+        1,
+        0,
+        11,
+        27,
+        0
+      ],
+      [
+        4,
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        11,
+        0,
+        19
+      ],
+      [
+        0,
+        128,
+        0,
+        0,
+        0
+      ],
+      [
+        160,
+        109,
+        0,
+        3,
+        73
+      ],
+      [
+        0,
+        10,
+        0,
+        0,
+        31
+      ],
+      [
+        73,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        21,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        12,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        78
+      ],
+      [
+        0,
+        5,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        140,
+        1,
+        0,
+        11
+      ],
+      [
+        0,
+        0,
+        199,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        2,
+        3,
+        0
+      ],
+      [
+        0,
+        0,
+        59,
+        368,
+        3
+      ],
+      [
+        18,
+        0,
+        4,
+        58,
+        96
+      ],
+      [
+        28,
+        65,
+        7,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        167,
+        0,
+        0
+      ],
+      [
+        6,
+        22,
+        10,
+        15,
+        46
+      ]
+    ],
+    "upload_bytes_per_client_per_round": 615742484,
+    "total_comm_bytes": 197037594880,
+    "trainable_params": 153935621,
+    "total_params": 154786831,
+    "wall_seconds": 426.74697622377425,
+    "peak_mib": 4909.1953125,
+    "nominal_clients": 20,
+    "active_clients": 20,
+    "skipped_client_ids": []
+  }
+}

@@ -1,0 +1,397 @@
+{
+  "task": "pfin",
+  "key": "pfin=deterministic|alpha=0.1|K=5|seed=1",
+  "parameters": {
+    "seed": 1,
+    "alpha": 0.1,
+    "clients": 5,
+    "fusion": null,
+    "init_mode": null,
+    "pfin_mode": "deterministic",
+    "deterministic": false
+  },
+  "protocol": {
+    "rounds": 8,
+    "local_epochs": 3,
+    "communication_schedule": "one download and upload per client per round",
+    "batch_size": 16,
+    "learning_rate": 0.0001,
+    "precision": "FP32",
+    "initialization": "public encoders + random task heads",
+    "data": "controlled_v2_real4_synthetic_covid_template_text"
+  },
+  "provenance": {
+    "base_model_sha256": "ce473f4bca58f8920d7c22b55b3e0dd28a2de227049f4ad77141659468cbf227",
+    "core_runner_sha256": "1805c5bafb5f4889ecab87fe16e3e16788d5e0d1c7d205f19c88f81555f420e4",
+    "reviewer_runner_sha256": "cdb9382800a3a21ee3665d0690e8591531c9c7ad8b3e9667427226b55dee4c9c",
+    "pfin_helper_sha256": "d95f2f41331fa6fe86fc2837a86148075ffbd5329db6b18b87e0cbd7c698a896",
+    "data_cache_sha256": "4286565db7ff817f6cca0894479b7c1f8836fa73aa09407fd906634dbb0969ba",
+    "torch": "2.11.0+cu128",
+    "gpu": "NVIDIA H100 NVL",
+    "deterministic_algorithms_enforced": false
+  },
+  "result": {
+    "method": "Deterministic FIN + FedAvg (matched adaptation)",
+    "mode": "deterministic",
+    "matched_adaptation": true,
+    "fusion_substitution": "L2-normalized feature concatenation + MLP replaces the published bidirectional cross-modal attention",
+    "f1": 0.3192857079022335,
+    "primary_f1": 0.45730808829945035,
+    "accuracy": 0.38666666666666666,
+    "diversity": 0.8,
+    "full_text_f1": 0.3192857079022335,
+    "full_text_accuracy": 0.38666666666666666,
+    "full_text_diversity": 0.8,
+    "forced_missing_text_f1": 0.45730808829945035,
+    "forced_missing_text_accuracy": 0.54,
+    "forced_missing_text_diversity": 0.8,
+    "full_text_metrics": {
+      "f1": 0.3192857079022335,
+      "accuracy": 0.38666666666666666,
+      "diversity": 0.8
+    },
+    "forced_missing_text_metrics": {
+      "f1": 0.45730808829945035,
+      "accuracy": 0.54,
+      "diversity": 0.8
+    },
+    "client_modality_mask": [
+      "multimodal",
+      "multimodal",
+      "image_only",
+      "image_only",
+      "multimodal"
+    ],
+    "multimodal_clients": [
+      0,
+      1,
+      4
+    ],
+    "image_only_clients": [
+      2,
+      3
+    ],
+    "client_sizes": [
+      352,
+      901,
+      920,
+      168,
+      59
+    ],
+    "client_class_hist": [
+      [
+        0,
+        10,
+        342,
+        0,
+        0
+      ],
+      [
+        0,
+        429,
+        0,
+        472,
+        0
+      ],
+      [
+        484,
+        0,
+        0,
+        0,
+        436
+      ],
+      [
+        0,
+        38,
+        129,
+        0,
+        1
+      ],
+      [
+        1,
+        2,
+        1,
+        2,
+        53
+      ]
+    ],
+    "history": {
+      "round_full_text_f1": [
+        0.18564593301435406,
+        0.16676915620314134,
+        0.22447132122413213,
+        0.30505667706790046,
+        0.4440320679671997,
+        0.23501890511746598,
+        0.4504637798131301,
+        0.3192857079022335
+      ],
+      "round_forced_missing_text_f1": [
+        0.1397729706575284,
+        0.36142931528247846,
+        0.4645131102267227,
+        0.516668134995663,
+        0.6643616933272642,
+        0.3963511754566351,
+        0.6228691695953985,
+        0.45730808829945035
+      ],
+      "round_full_text_accuracy": [
+        0.3,
+        0.28,
+        0.3416666666666667,
+        0.365,
+        0.4766666666666667,
+        0.31833333333333336,
+        0.485,
+        0.38666666666666666
+      ],
+      "round_forced_missing_text_accuracy": [
+        0.24833333333333332,
+        0.46166666666666667,
+        0.5433333333333333,
+        0.5616666666666666,
+        0.67,
+        0.49333333333333335,
+        0.6516666666666666,
+        0.54
+      ],
+      "round_full_text_diversity": [
+        0.4,
+        0.4,
+        0.8,
+        0.8,
+        1.0,
+        1.0,
+        1.0,
+        0.8
+      ],
+      "round_forced_missing_text_diversity": [
+        0.4,
+        0.6,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        0.8
+      ],
+      "client_mean_uncertainty": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "aggregation_weights": [
+        [
+          0.14666666666666667,
+          0.3754166666666667,
+          0.38333333333333336,
+          0.07,
+          0.024583333333333332
+        ],
+        [
+          0.14666666666666667,
+          0.3754166666666667,
+          0.38333333333333336,
+          0.07,
+          0.024583333333333332
+        ],
+        [
+          0.14666666666666667,
+          0.3754166666666667,
+          0.38333333333333336,
+          0.07,
+          0.024583333333333332
+        ],
+        [
+          0.14666666666666667,
+          0.3754166666666667,
+          0.38333333333333336,
+          0.07,
+          0.024583333333333332
+        ],
+        [
+          0.14666666666666667,
+          0.3754166666666667,
+          0.38333333333333336,
+          0.07,
+          0.024583333333333332
+        ],
+        [
+          0.14666666666666667,
+          0.3754166666666667,
+          0.38333333333333336,
+          0.07,
+          0.024583333333333332
+        ],
+        [
+          0.14666666666666667,
+          0.3754166666666667,
+          0.38333333333333336,
+          0.07,
+          0.024583333333333332
+        ],
+        [
+          0.14666666666666667,
+          0.3754166666666667,
+          0.38333333333333336,
+          0.07,
+          0.024583333333333332
+        ]
+      ],
+      "fin_aggregation_weights": [
+        [
+          0.2682926829268293,
+          0.6867378048780488,
+          0.0,
+          0.0,
+          0.04496951219512195
+        ],
+        [
+          0.2682926829268293,
+          0.6867378048780488,
+          0.0,
+          0.0,
+          0.04496951219512195
+        ],
+        [
+          0.2682926829268293,
+          0.6867378048780488,
+          0.0,
+          0.0,
+          0.04496951219512195
+        ],
+        [
+          0.2682926829268293,
+          0.6867378048780488,
+          0.0,
+          0.0,
+          0.04496951219512195
+        ],
+        [
+          0.2682926829268293,
+          0.6867378048780488,
+          0.0,
+          0.0,
+          0.04496951219512195
+        ],
+        [
+          0.2682926829268293,
+          0.6867378048780488,
+          0.0,
+          0.0,
+          0.04496951219512195
+        ],
+        [
+          0.2682926829268293,
+          0.6867378048780488,
+          0.0,
+          0.0,
+          0.04496951219512195
+        ],
+        [
+          0.2682926829268293,
+          0.6867378048780488,
+          0.0,
+          0.0,
+          0.04496951219512195
+        ]
+      ],
+      "round_seconds": [
+        315.0912448707968,
+        327.478876481764,
+        328.0503859538585,
+        363.3686404880136,
+        314.2022162419744,
+        317.66669621970505,
+        224.40841500461102,
+        144.29481612099335
+      ],
+      "round_peak_mib": [
+        4892.73779296875,
+        4892.70654296875,
+        4898.67529296875,
+        4895.51904296875,
+        4897.90966796875,
+        4896.59716796875,
+        4897.73779296875,
+        4894.11279296875
+      ]
+    },
+    "alpha": 0.1,
+    "num_clients": 5,
+    "nominal_clients": 5,
+    "active_clients": 5,
+    "skipped_client_ids": [],
+    "rounds": 8,
+    "local_epochs": 3,
+    "seed": 1,
+    "feature_dim": 256,
+    "beta": null,
+    "rho": null,
+    "temperature": null,
+    "fin_loss_weight": 1.0,
+    "trainable_params": 155056133,
+    "total_params": 155512591,
+    "upload_bytes_per_client_per_round": 620224532,
+    "uq_scalar_bytes": 0,
+    "total_comm_bytes": 49617962560,
+    "wall_seconds": 2334.5612913817167,
+    "peak_mib": 4898.67529296875,
+    "peak_gpu_allocated_mib": 4898.67529296875,
+    "measurement_scope": "sequential local training, client uncertainty scan, aggregation, and peak allocated GPU memory; validation and process CPU RSS excluded"
+  }
+}
