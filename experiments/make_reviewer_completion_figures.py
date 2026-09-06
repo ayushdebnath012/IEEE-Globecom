@@ -1251,7 +1251,8 @@ def _systems_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
         ) / (1024.0**3)
         cost_values[2, column] = _number(record, "wall_seconds", branch) / 60.0
         cost_values[3, column] = _number(record, "peak_mib", branch) / 1024.0
-    row_max = np.maximum(cost_values.max(axis=1, keepdims=True), np.finfo(float).eps)
+    # astroid's ndarray stub omits keepdims, so pylint mis-flags this valid call.
+    row_max = np.maximum(cost_values.max(axis=1, keepdims=True), np.finfo(float).eps)  # pylint: disable=unexpected-keyword-arg
     normalized = cost_values / row_max
     ax = axes[1, 1]
     ax.imshow(normalized, cmap="Blues", vmin=0.0, vmax=1.0, aspect="auto")
