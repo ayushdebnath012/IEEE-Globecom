@@ -92,11 +92,8 @@ Emails: \{ayush.d@kgpian.iitkgp.ac.in, ruelia.saha.rs@gmail.com, sudipm@iitkgp.a
 \maketitle
 
 \begin{abstract}
-Simultaneous assessment of medical imaging and patient records is required in
-clinical diagnosis. But standard machine learning pipelines cannot analyze these
-several sorts of data together. Meanwhile, HIPAA and GDPR preclude hospitals from
-aggregating sensitive patient data centrally. This leaves a crucial void: secure
-fusion of visual and textual context across distant networks. We present OmniMed-FL,
+Clinical assessment often combines medical images with accompanying text, while
+privacy and governance constraints can limit centralized data pooling. We present OmniMed-FL,
 a controlled systems study of multimodal federated learning for five-class clinical
 condition classification (Normal, Pneumonia, COVID-19, Pleural Effusion,
 Cardiomegaly). Our proxy corpus pairs 2,400 public chest radiographs and 600
@@ -142,8 +139,7 @@ vision--language modeling. Their intersection is not. Put the two together and f
 questions arrive at once: how badly does label skew hurt, when does a five-class head
 collapse onto its majority class, which fusion operator earns its compute, and what
 does a multimodal model cost to move. OmniMed-FL
-answers those four for a controlled proxy benchmark, and we would rather be blunt
-about scope up front. Our radiographs and synthetic notes are not patient matched,
+answers those four for a controlled proxy benchmark. Our radiographs and synthetic notes are not patient matched,
 so we measure the learning system, not clinical diagnosis. ``Robust'' here means
 stress tests across partitions, client counts, and missing modalities, not a
 clinical guarantee.
@@ -161,9 +157,9 @@ P-FIN-style missing-text stress test over four imputation rules.
 \item We report the systems side that accuracy tables usually omit: realized
 per-client skew, GPU-synchronized round time, peak memory, formula-derived
 bidirectional FP32 volume, and retrieval over all 600 validation queries.
-\item We publish the null results too. The fusion sweep, the FedProx--FedAvg gap,
-and most anti-collapse contrasts at moderate skew come out smaller than their own
-two-seed spreads, and we say so rather than rank them.
+\item We report unresolved comparisons explicitly. The fusion sweep, the
+FedProx--FedAvg gap, and most anti-collapse contrasts at moderate skew are smaller
+than their two-seed spreads and therefore do not support a reliable ranking.
 \end{itemize}
 
 
@@ -198,11 +194,11 @@ over one-shot client ensembles, and P-FIN imputes missing features with calibrat
 uncertainty~\cite{Wang2025fedmme,Shahid2026pfin}, and federated clinical VLMs are
 only now appearing~\cite{Yan2024crossmodal,Akkaya2024fedvlm,Zhang2024globecom}.
 
-\textbf{Synthesis.} The gap is not that nobody has combined the two halves. It is
-that the papers which do sit on different datasets, backbones, and budgets, which
-makes their headline scores incomparable. So we rebuild FedMME- and P-FIN-style arms
-inside our own loop as matched adaptations, and never quote a score across papers.
-Holding everything but one factor fixed is what earns the results: it is why we can
+\textbf{Synthesis.} Existing combinations use different datasets, backbones, and
+budgets, making their headline scores incomparable. We therefore rebuild
+FedMME- and P-FIN-style arms
+inside our own loop as matched adaptations rather than comparing scores across papers.
+Holding everything but one factor fixed enables attribution: it is why we can
 attribute the one-shot deficit to aggregation rather than to FedMME's larger local
 budget, and why an eight-way fusion sweep that looks decisive turns out to be noise.
 

@@ -22,8 +22,8 @@ share the 24-local-epoch budget. Local-only training averages a macro-F1 score o
 0.310 across the five clients of one partition. Over
 two matched seeds, FedAvg reaches $0.652\!\pm\!0.057$ and FedProx
 $0.685\!\pm\!0.064$. Their 0.033 gap is smaller than either sample standard
-deviation, so these runs do not separate the two methods and we will not pretend
-otherwise. Our SCAFFOLD--AdamW adaptation lands at $0.192\!\pm\!0.129$, and the
+deviation, so these runs do not separate the two methods. Our SCAFFOLD--AdamW
+adaptation lands at $0.192\!\pm\!0.129$, and the
 oscillation in panel~(b) points at our AdamW control-variate adaptation rather than
 at classical SGD-based SCAFFOLD. The FedMME-style arm trains five client models
 independently and combines them by equal-weight hard voting with mean-softmax ties. At our matched 24-epoch budget it reaches
@@ -162,21 +162,21 @@ operating point plainly. Communication grows linearly in $K$ while accuracy stay
 nearly flat in $K$. At $\alpha{=}5$, going from $K{=}3$ to $K{=}20$ buys a 0.014 F1
 change for $6.7\times$ the traffic.
 
-The one-run branch audit in panel~(e) is where the multimodal bill comes due.
+The one-run branch audit in panel~(e) quantifies the multimodal overhead.
 Text, image, and multimodal F1 are 0.893/0.740/0.782, one-way FP32 model-state
 sizes are 0.248/0.324/0.573\,GiB, sums of timed round durations are
 18.5/33.6/45.0\,min, and peak allocated memory is 1.69/3.18/4.77\,GiB. Multimodal
 concatenation costs $2.3\times$ the model state, $2.4\times$ the wall time, and
 $2.8\times$ the memory of the text branch, and it scores 0.111 F1 below that branch.
-One run per branch cannot support a blanket claim of multimodal superiority, and we
-suspect a mundane cause: class-conditioned template shortcuts that the text encoder
-can exploit directly.
+One run per branch cannot support a blanket claim of multimodal superiority. A
+plausible explanation is that the text encoder directly exploits class-conditioned
+template shortcuts.
 
 \section{Discussion and Limitations}
 
-Partition sensitivity is the finding that survives everything we threw at it: at
-$\alpha{=}0.1$, even identically configured FedAvg reruns move substantially. Three
-boundaries hem in what that buys a deployment. First, our client-count study is a
+Partition sensitivity is the most consistent finding: at $\alpha{=}0.1$, even
+identically configured FedAvg reruns vary substantially. Three limitations bound
+its practical interpretation. First, our client-count study is a
 sequential simulation on a shared server. It models neither concurrent workers,
 latency, stragglers, and dropout nor heterogeneous accelerators, and we never test
 aggregation against poisoned or Byzantine updates. Our own dispersion hints at why
@@ -208,5 +208,5 @@ initializations, four missing-text imputation rules, and matched FedAvg, FedProx
 SCAFFOLD--AdamW, and FedMME-style baselines, one result holds consistently. Label
 skew dominates. Client count is near-neutral for accuracy and linear in
 communication. Everything else is conditional on the partition realization and our
-protocol choices. Real patient-paired data and safeguards come before clinical use, and we would rather publish the null results
-than imply we have cleared that bar.
+protocol choices. Real patient-paired data, external validation, and appropriate
+safeguards are required before clinical use.
