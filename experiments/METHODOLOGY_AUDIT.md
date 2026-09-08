@@ -163,20 +163,34 @@ instead, pinning its parent and every runner by SHA-256:
 |---|---|---|
 | `legacy_sha256` | `results_corrected_merged.json` | matches |
 | `corrected_retrieval_sha256` | `corrected_rag_retrieval.json` | matches |
-| `core_runner_sha256` | `omnimed_experiments.py` | matches |
+| `core_runner_sha256` | `omnimed_experiments.py` | matches at `52d5bf2` &dagger; |
 | `retrieval_runner_sha256` | `rag_retrieval_corrected.py` | matches |
 | `pfin_helper_sha256` | `pfin_matched.py` | matches |
-| `reviewer_runner_sha256_native_budget` | `reviewer_completion.py` | matches |
+| `reviewer_runner_sha256_native_budget` | `reviewer_completion.py` | matches at `52d5bf2` &dagger; |
 | `reviewer_runner_sha256` | superseded runner revision | not retained |
 
 `legacy_sha256` is the same digest this document records for the validated
 artifact, so the audited set is the parent of the set the manuscript reports.
-Every hash above except the superseded reviewer-runner revision resolves to a file
-committed here, and each can be checked directly:
+&dagger; These two runners have advanced past the revision that produced this store.
+`omnimed_experiments.py` gained the real-only v3 image protocol and
+`reviewer_completion.py` the changes that accompany it, so both now hash
+differently from the digests recorded above. Neither edit is retroactive: the
+pinned revisions are the ones committed at `52d5bf2`, recovered with
+`git show 52d5bf2:experiments/omnimed_experiments.py`. Until a v3 merge records
+its own runner hashes, those two entries verify against that commit rather than
+against the working tree.
+
+Every hash above resolves to a file committed here -- the two marked &dagger; at
+`52d5bf2` rather than at the tip, and the superseded reviewer-runner revision
+excepted -- and each can be checked directly:
 
 ```sh
 python - <<'PY'
-import json, hashlib
+import json, hashlib, subprocess
+# The two fields marked with a dagger above are checked at the revision that
+# produced this store, not at the working tree.
+PINNED = {'core_runner_sha256': '52d5bf2',
+          'reviewer_runner_sha256_native_budget': '52d5bf2'}
 m = json.load(open('reviewer_results_merged.json', encoding='utf8'))['_meta']
 for field, path in [
         ('legacy_sha256', 'results_corrected_merged.json'),
@@ -185,14 +199,20 @@ for field, path in [
         ('retrieval_runner_sha256', 'rag_retrieval_corrected.py'),
         ('pfin_helper_sha256', 'pfin_matched.py'),
         ('reviewer_runner_sha256_native_budget', 'reviewer_completion.py')]:
-    got = hashlib.sha256(open(path, 'rb').read()).hexdigest()
-    print(f"{'ok ' if got == m[field] else 'BAD'} {path}")
+    rev = PINNED.get(field)
+    if rev is None:
+        blob = open(path, 'rb').read()
+    else:
+        blob = subprocess.run(['git', 'show', f'{rev}:experiments/{path}'],
+                              capture_output=True, check=True).stdout
+    got = hashlib.sha256(blob).hexdigest()
+    print(f"{'ok ' if got == m[field] else 'BAD'} {path}{' @' + rev if rev else ''}")
 PY
 ```
 
 What this does and does not establish: it establishes that the manuscript's
 numbers descend from the audited artifact and that the code which produced them is
-the code committed here. It is not a substitute for `validate_results.py` — the
+committed here -- for the two marked &dagger;, at `52d5bf2` rather than at the tip. It is not a substitute for `validate_results.py` — the
 record-count, key-set, and protocol invariants that check the earlier artifact have
 no equivalent for the newer schema. The `_meta` flags
 `legacy_meta_and_protocol_validated`, `new_record_protocols_validated`,

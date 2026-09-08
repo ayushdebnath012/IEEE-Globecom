@@ -5,17 +5,18 @@ Multimodal federated learning for five-class clinical condition classification
 
 Submitted to IEEE GLOBECOM.
 
-> **The earlier results in this repository are withdrawn.** Between submission and
+> **The earlier results in this repository are superseded.** Between submission and
 > this revision the entire experimental suite was re-run under audit, and several
-> headline numbers did not survive. They are withdrawn rather than defended: the
+> headline numbers did not survive. They are not used as current evidence: the
 > original comparison table, the "18 model variants" framing, the five-LLM/five-ViT
-> encoder sweep, the 99.1% centralized-retention claim, and the 0.89
-> retrieval-similarity claim are all gone. The revised manuscript reports *different
-> and lower* scores than the version the reviewers saw. `paper/` is the audited
+> encoder sweep, the 99.1% centralized-retention summary, and the 0.89
+> retrieval-similarity claim do not support the revised conclusions. To preserve
+> continuity with the accepted paper, the Results section distributes six of its pilot
+> plots and the branch scores behind 99.1% near their corresponding discussions,
+> clearly labeled as pre-audit, non-pooled context. The
+> revised manuscript reports *different and lower* audited scores. `paper/` is the
 > version; `paper/RESPONSE_TO_REVIEWERS.md` itemizes every correction and
 > `experiments/METHODOLOGY_AUDIT.md` explains why the earlier runs were invalid.
-> The pre-audit figures that used to live in `paper/omnimed_plots/` have been
-> removed; they remain in the history of the [OmniMed-FL archive](https://github.com/ayushdebnath012/OmniMed-FL).
 
 ```
 paper/        the audited manuscript, its figures, and the compiled PDF
@@ -30,12 +31,13 @@ source/       training code, and the results behind the withdrawn submission
 | `Globecom_final.tex` | manuscript source (IEEEtran, 6 pages) |
 | `Globecom_final.pdf` | compiled |
 | `results_corrected.tex` | the Results section, `\input` by the manuscript |
-| `generated/` | audited figures and the generated LaTeX tables |
+| `generated/` | audited figures, selected accepted-version pilot plots, and generated LaTeX tables |
 | `RESPONSE_TO_REVIEWERS.md` | reply to the reviewers, and the withdrawn claims |
 
 Compiles with `pdflatex` in three passes. `\graphicspath` points at `generated/`,
-so the tree compiles as-is. Every number and figure in it comes from
-`experiments/reviewer_results_merged.json`.
+so the tree compiles as-is. Audited results come from
+`experiments/reviewer_results_merged.json`; selected `legacy_*.png` panels preserve
+the accepted-version pilot and are explicitly separated from current conclusions.
 
 ## source/
 

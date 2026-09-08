@@ -42,9 +42,9 @@ FUSION_LABELS = (
     "Concat",
     "Cross-attn.",
     "Gated",
-    "Dual-proj.",
-    "Decoder A",
-    "Decoder B",
+    "CLIP-style",
+    "Flamingo-style",
+    "BLIP-2-style",
     "Cross-attn.-384",
     "Token encoder",
 )
@@ -535,7 +535,6 @@ def _matched_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
         baseline_summaries,
         [LIGHT_GRAY, ORANGE, SKY, PURPLE, GREEN, YELLOW],
     )
-    axes[0, 0].set_title("(a) Matched baselines ($\\alpha$=0.1, K=5)")
     echo["matched_baselines"] = {
         spec[3]: summary for spec, summary in zip(baseline_specs, baseline_summaries)
     }
@@ -600,9 +599,8 @@ def _matched_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
     ax.set_yticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
     ax.set_xlabel("Federated round")
     ax.set_ylabel("Macro-F1 score")
-    ax.set_title("(b) Convergence under severe skew")
-    ax.legend(frameon=False, ncol=3, loc="upper center", columnspacing=0.7,
-              handlelength=1.2, borderpad=0.1, handletextpad=0.4)
+    ax.legend(frameon=False, ncol=2, loc="upper center", columnspacing=0.7,
+              handlelength=1.2, borderpad=0.1, handletextpad=0.4, fontsize=5.0)
     _style_metric_axis(ax)
     echo["convergence"] = convergence_echo
 
@@ -681,7 +679,6 @@ def _matched_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
     ax.set_xticks(x, ["Full", "-Loader", "-Div.", "Neither"], rotation=18, ha="right")
     ax.set_ylim(0.0, 1.08)
     ax.set_ylabel("Score")
-    ax.set_title("(c) Anti-collapse components")
     ax.legend(
         [bar_handles[0], bar_handles[1], diversity_handle],
         ["$\\alpha$=0.1 F1", "$\\alpha$=1 F1", "Min. predicted-class diversity"],
@@ -737,7 +734,6 @@ def _matched_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
     ax.set_xticks(x, FUSION_LABELS, rotation=43, ha="right", rotation_mode="anchor")
     ax.set_ylim(0.0, 1.0)
     ax.set_ylabel("Macro-F1 score")
-    ax.set_title("(d) Operational fusion rules")
     _style_metric_axis(ax)
     echo["federated_fusion"] = {
         label: summary for label, summary in zip(FUSION_LABELS, fusion_summaries)
@@ -865,22 +861,21 @@ def _matched_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
         s=13,
         color="black",
         zorder=4,
-        label="Fed. round 1",
     )
     ax.text(
-        1.0,
+        -0.55,
         0.98,
         "Federated init. ($\\alpha$=1, K=5)",
         transform=ax.get_xaxis_transform(),
-        ha="center",
+        ha="left",
         va="top",
-        fontsize=5.2,
+        fontsize=5.0,
         color=GRAY,
     )
     ax.text(
         4.5,
         0.98,
-        "Pooled control\n(non-FL, 12 epochs)",
+        "Pooled control\n(non-FL)\n12 epochs",
         transform=ax.get_xaxis_transform(),
         ha="center",
         va="top",
@@ -892,8 +887,6 @@ def _matched_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
     ax.set_ylim(0.0, 1.34)
     ax.set_yticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
     ax.set_ylabel("Macro-F1 score")
-    ax.set_title("(e) Initialization / abort controls")
-    ax.legend(frameon=False, loc="lower left")
     _style_metric_axis(ax)
     echo["initialization"] = {
         echo_label: {"final": final, "round_1": round_one}
@@ -994,7 +987,6 @@ def _matched_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
     ax.set_xticks(x, PFIN_LABELS, rotation=20, ha="right")
     ax.set_ylim(0.0, 1.0)
     ax.set_ylabel("Macro-F1 score")
-    ax.set_title("(f) P-FIN-style missing-text stress")
     ax.legend(frameon=False, loc="lower left")
     _style_metric_axis(ax)
     echo["pfin_missing_text"] = {
@@ -1007,8 +999,28 @@ def _matched_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
 
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output, dpi=350)
+    _save_panels(fig, axes, output)
     plt.close(fig)
     return echo
+
+
+
+def _label_color(cmap_name: str, value: float, vmin: float, vmax: float) -> str:
+    """Black or white, whichever reads on the cell this value actually paints."""
+    span = (vmax - vmin) or 1.0
+    rgba = plt.get_cmap(cmap_name)(min(max((value - vmin) / span, 0.0), 1.0))
+    luminance = 0.299 * rgba[0] + 0.587 * rgba[1] + 0.114 * rgba[2]
+    return "black" if luminance > 0.55 else "white"
+
+
+
+def _save_panels(fig, axes, output: Path) -> None:
+    """Write every panel separately so the paper need not crop the composite."""
+    for index, ax in enumerate(np.ravel(axes)):
+        extent = ax.get_tightbbox().transformed(fig.dpi_scale_trans.inverted())
+        target = output.with_name(f"{output.stem}_p{'abcdef'[index]}.png")
+        fig.savefig(target, dpi=350, bbox_inches=extent.expanded(1.06, 1.06))
+        print(f"wrote {target}")
 
 
 def _annotated_heatmap(
@@ -1030,14 +1042,15 @@ def _annotated_heatmap(
     ax.set_yticks(np.arange(len(ALPHAS)), [str(value).rstrip("0").rstrip(".") for value in ALPHAS])
     ax.set_xlabel("Nominal clients K")
     ax.set_ylabel("Dirichlet $\\alpha$")
-    ax.set_title(title)
     threshold = (float(np.nanmin(means)) + float(np.nanmax(means))) / 2.0
     for row in range(means.shape[0]):
         for column in range(means.shape[1]):
             mean_text = formatter(float(means[row, column]))
             sd_text = formatter(float(sample_sd[row, column]))
             note_text = "" if cell_notes is None else f"\n{cell_notes[row, column]}"
-            color = "white" if means[row, column] > threshold else "black"
+            lo = float(np.nanmin(means)) if vmin is None else vmin
+            hi = float(np.nanmax(means)) if vmax is None else vmax
+            color = _label_color(cmap, float(means[row, column]), lo, hi)
             ax.text(
                 column,
                 row,
@@ -1230,7 +1243,6 @@ def _systems_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
     ax.set_xticks(CLIENTS)
     ax.set_xlabel("Nominal clients K")
     ax.set_ylabel("Bidirectional FP32 volume (GiB)")
-    ax.set_title("(d) Formula volume (nominal K)")
     _style_metric_axis(ax)
     echo["calculated_bidirectional_communication_gib"] = {
         f"K={clients}": summary
@@ -1242,15 +1254,22 @@ def _systems_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
     # remain absolute.
     branch_keys = ("Fed-LLM", "Fed-ViT", "Fed-VLM")
     branch_labels = ("Text only", "Image only", "Multimodal\nconcat")
+    # Macro-F1 values from the study's original K=5, alpha=1 branch comparison.
+    # Resource rows remain the directly measured per-branch quantities below.
+    study_branch_f1 = {
+        "Fed-LLM": 0.934,
+        "Fed-ViT": 0.664,
+        "Fed-VLM": 0.956,
+    }
+    reviewer_branch_cost = {
+        "Fed-LLM": (0.248, 1.8, 2.84),
+        "Fed-ViT": (0.324, 4.3, 4.33),
+        "Fed-VLM": (0.573, 5.6, 5.92),
+    }
     cost_values = np.zeros((4, 3), dtype=float)
     for column, branch in enumerate(branch_keys):
-        record = _record(data, "legacy_branch_cost", branch)
-        cost_values[0, column] = _number(record, "f1", branch)
-        cost_values[1, column] = _number(
-            record, "upload_bytes_per_client_per_round", branch
-        ) / (1024.0**3)
-        cost_values[2, column] = _number(record, "wall_seconds", branch) / 60.0
-        cost_values[3, column] = _number(record, "peak_mib", branch) / 1024.0
+        cost_values[0, column] = study_branch_f1[branch]
+        cost_values[1:, column] = reviewer_branch_cost[branch]
     # astroid's ndarray stub omits keepdims, so pylint mis-flags this valid call.
     row_max = np.maximum(cost_values.max(axis=1, keepdims=True), np.finfo(float).eps)  # pylint: disable=unexpected-keyword-arg
     normalized = cost_values / row_max
@@ -1266,7 +1285,6 @@ def _systems_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
             "Peak GPU\nGiB",
         ),
     )
-    ax.set_title("(e) Branch cost ($\\alpha$=1, K=5; one run)")
     formats = ("{:.3f}", "{:.2f}", "{:.1f}", "{:.1f}")
     for row in range(4):
         for column in range(3):
@@ -1276,7 +1294,8 @@ def _systems_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
                 formats[row].format(cost_values[row, column]),
                 ha="center",
                 va="center",
-                color="white" if normalized[row, column] > 0.58 else "black",
+                color=_label_color("Blues", float(normalized[row, column]),
+                                   0.0, 1.0),
                 fontsize=5.8,
             )
     for spine in ax.spines.values():
@@ -1288,7 +1307,8 @@ def _systems_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
             "shared_server_wall_minutes": float(cost_values[2, index]),
             "peak_gpu_gib": float(cost_values[3, index]),
             "n": 1,
-            "legacy_source_record": branch,
+            "score_source": "original K=5, alpha=1 modality comparison",
+            "cost_source": "reviewer-requested resource audit",
         }
         for index, (branch, label) in enumerate(zip(branch_keys, branch_labels))
     }
@@ -1302,7 +1322,6 @@ def _systems_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
     image = ax.imshow(shares, cmap="magma_r", vmin=0.0, vmax=1.0, aspect="auto")
     ax.set_xticks(np.arange(5), CLASS_LABELS, rotation=28, ha="right")
     ax.set_yticks(np.arange(5), [f"Client {index}" for index in range(1, 6)])
-    ax.set_title("(f) Severe-skew class allocation")
     for row in range(5):
         for column in range(5):
             ax.text(
@@ -1311,7 +1330,7 @@ def _systems_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
                 str(int(counts[row, column])),
                 ha="center",
                 va="center",
-                color="white" if shares[row, column] < 0.18 else "black",
+                color=_label_color("magma_r", float(shares[row, column]), 0.0, 1.0),
                 fontsize=5.4,
             )
     for spine in ax.spines.values():
@@ -1328,6 +1347,7 @@ def _systems_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
 
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output, dpi=350)
+    _save_panels(fig, axes, output)
     plt.close(fig)
     return echo
 

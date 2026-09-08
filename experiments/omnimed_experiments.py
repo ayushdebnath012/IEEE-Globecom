@@ -39,6 +39,7 @@ from __future__ import annotations
 import argparse
 import copy
 import gc
+import hashlib
 import importlib.util
 import json
 import os
@@ -46,6 +47,7 @@ import pickle
 import random
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -416,7 +418,8 @@ def federated_train_ex(mf, model_class, model_kwargs, train_dataset, val_loader,
                        cfg, device, model_type="multimodal",
                        *, alpha=1.0, num_clients=5, rounds=8, local_epochs=3,
                        use_balanced_sampler=True, diversity_weight=1.0,
-                       warm_start_state=None, seed=0, log_prefix=""):
+                       warm_start_state=None, seed=0, log_prefix="",
+                       extra_evals=None, extra_eval_fn=None):
     """FedAvg with the anti-collapse components individually switchable.
 
     diversity_weight=0.0 disables the entropy diversity term.
@@ -520,7 +523,19 @@ def federated_train_ex(mf, model_class, model_kwargs, train_dataset, val_loader,
               f"{gm.seconds:.1f}s {gm.peak_mib:.0f}MiB")
 
     final = mf.evaluate(global_model, val_loader, device, model_type)
+    # Optional extra scorings of the same final model, e.g. the validation set
+    # with the clinical note removed. Evaluated before the model is released.
+    extra = {}
+    for extra_name, extra_loader in (extra_evals or {}).items():
+        m = mf.evaluate(global_model, extra_loader, device, model_type)
+        extra[extra_name] = {k: float(m[k]) for k in ("f1", "accuracy", "diversity")}
+        print(f"    {log_prefix}{extra_name}: F1={m['f1']:.4f} acc={m['accuracy']:.4f}")
+    # A caller that needs more than macro scores -- per-class F1, say -- gets the
+    # trained model here rather than having to retrain to inspect it.
+    if extra_eval_fn is not None:
+        extra.update(extra_eval_fn(global_model, device))
     out = {
+        "extra": extra,
         "f1": float(final["f1"]),
         "accuracy": float(final["accuracy"]),
         "diversity": float(final["diversity"]),
@@ -1209,6 +1224,17 @@ def main(base_py: str, tier: str = "standard", out: str = "results_v2.json",
     _patch_datasets()
     mf = load_base(base_py)
     _patch_image_loader(mf)
+
+    # Real-only protocol. With OM_COVID_ROOT set, COVID-19 comes from the
+    # Kaggle Radiography Database and the synthetic generators are disabled,
+    # so a dead source raises instead of being silently backfilled.
+    covid_root = os.environ.get("OM_COVID_ROOT")
+    real_only = bool(covid_root)
+    if real_only:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from real_covid_loader import PROTOCOL as REAL_PROTOCOL
+        from real_covid_loader import install_real_only_sources
+        install_real_only_sources(mf, covid_root, seed=mf.Config().seed)
     if not verify_encoders(mf, [t["text_model"]]):
         raise SystemExit(
             "\nStopping: the text encoder is not loading pretrained weights, "
@@ -1241,12 +1267,30 @@ def main(base_py: str, tier: str = "standard", out: str = "results_v2.json",
         "device": str(device),
         "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
         "torch": torch.__version__,
-        "data_protocol": "controlled_v2_real4_synthetic_covid_template_text",
+        "data_protocol": (REAL_PROTOCOL if real_only
+                          else "controlled_v2_real4_synthetic_covid_template_text"),
         "fl_initialization": "public_pretrained_encoders_random_task_heads",
         "training_precision": "fp32_tensors_no_amp",
         "deterministic_algorithms_enforced": torch.are_deterministic_algorithms_enabled(),
         "n_train": len(data["train_texts"]), "n_val": len(data["val_texts"]),
     })
+    if real_only:
+        # Provenance the validator checks. Counted from the corpus actually
+        # loaded, not asserted, so a silent substitution would show up here.
+        img_counts = Counter(l[0] for l in data["train_ilbls"])
+        img_counts.update(l[0] for l in data["val_ilbls"])
+        h = hashlib.sha256()
+        with open(cache_path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                h.update(chunk)
+        store.data["_meta"].update({
+            "data_cache_sha256": h.hexdigest(),
+            "image_source_counts": {"public_radiographs": sum(img_counts.values())},
+            "text_source_counts": {
+                "synthetic_class_conditioned_templates":
+                    len(data["train_texts"]) + len(data["val_texts"])},
+            "covid_source": "kaggle:tawsifurrahman/covid19-radiography-database",
+        })
     store.flush()
 
     t0 = time.perf_counter()

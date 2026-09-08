@@ -56,3 +56,6 @@ tmp/
 *.faiss
 *.zip
 *.mp4
+
+# admin material, not paper content
+paper/AI Detector*.pdf

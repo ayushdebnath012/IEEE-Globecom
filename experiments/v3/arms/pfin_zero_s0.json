@@ -1,0 +1,397 @@
+{
+  "task": "pfin",
+  "key": "pfin=zero|alpha=0.1|K=5|seed=0",
+  "parameters": {
+    "seed": 0,
+    "alpha": 0.1,
+    "clients": 5,
+    "fusion": null,
+    "init_mode": null,
+    "pfin_mode": "zero",
+    "deterministic": false
+  },
+  "protocol": {
+    "rounds": 8,
+    "local_epochs": 3,
+    "communication_schedule": "one download and upload per client per round",
+    "batch_size": 16,
+    "learning_rate": 0.0001,
+    "precision": "FP32",
+    "initialization": "public encoders + random task heads",
+    "data": "controlled_v3_real5_template_text"
+  },
+  "provenance": {
+    "base_model_sha256": "ce473f4bca58f8920d7c22b55b3e0dd28a2de227049f4ad77141659468cbf227",
+    "core_runner_sha256": "344fe4a5bbcff880a362d36f72a39cd2a3cd25c608474953f81bf3dc044a8fe4",
+    "reviewer_runner_sha256": "91425bc59bc3ea20f19d3a67fb94b3fba4447bcda9fa2eef80a27058e8f48452",
+    "pfin_helper_sha256": "d95f2f41331fa6fe86fc2837a86148075ffbd5329db6b18b87e0cbd7c698a896",
+    "data_cache_sha256": "82bc364d664a2d2124adb642c296e2e7d84ecf843f306e6287815690c2a4204a",
+    "torch": "2.13.0+cu130",
+    "gpu": "NVIDIA H100 NVL",
+    "deterministic_algorithms_enforced": false
+  },
+  "result": {
+    "method": "Zero-fill + FedAvg (matched missing-text control)",
+    "mode": "zero",
+    "matched_adaptation": true,
+    "fusion_substitution": "L2-normalized feature concatenation + MLP replaces the published bidirectional cross-modal attention",
+    "f1": 0.6704365640526941,
+    "primary_f1": 0.6854191026879877,
+    "accuracy": 0.715,
+    "diversity": 1.0,
+    "full_text_f1": 0.6704365640526941,
+    "full_text_accuracy": 0.715,
+    "full_text_diversity": 1.0,
+    "forced_missing_text_f1": 0.6854191026879877,
+    "forced_missing_text_accuracy": 0.6866666666666666,
+    "forced_missing_text_diversity": 1.0,
+    "full_text_metrics": {
+      "f1": 0.6704365640526941,
+      "accuracy": 0.715,
+      "diversity": 1.0
+    },
+    "forced_missing_text_metrics": {
+      "f1": 0.6854191026879877,
+      "accuracy": 0.6866666666666666,
+      "diversity": 1.0
+    },
+    "client_modality_mask": [
+      "multimodal",
+      "multimodal",
+      "image_only",
+      "image_only",
+      "multimodal"
+    ],
+    "multimodal_clients": [
+      0,
+      1,
+      4
+    ],
+    "image_only_clients": [
+      2,
+      3
+    ],
+    "client_sizes": [
+      646,
+      405,
+      27,
+      158,
+      1164
+    ],
+    "client_class_hist": [
+      [
+        31,
+        107,
+        427,
+        0,
+        81
+      ],
+      [
+        35,
+        0,
+        11,
+        359,
+        0
+      ],
+      [
+        0,
+        27,
+        0,
+        0,
+        0
+      ],
+      [
+        5,
+        0,
+        48,
+        105,
+        0
+      ],
+      [
+        429,
+        325,
+        7,
+        1,
+        402
+      ]
+    ],
+    "history": {
+      "round_full_text_f1": [
+        0.4838638243459842,
+        0.56831876811974,
+        0.6112814261000928,
+        0.6320374475983012,
+        0.5996535948373911,
+        0.6501172908327677,
+        0.6487909653663876,
+        0.6704365640526941
+      ],
+      "round_forced_missing_text_f1": [
+        0.45286601498236817,
+        0.6352110273890131,
+        0.6160072010064942,
+        0.6985762461366772,
+        0.6469768572136637,
+        0.6551223287891194,
+        0.6978931628178003,
+        0.6854191026879877
+      ],
+      "round_full_text_accuracy": [
+        0.53,
+        0.615,
+        0.655,
+        0.68,
+        0.6516666666666666,
+        0.6983333333333334,
+        0.6966666666666667,
+        0.715
+      ],
+      "round_forced_missing_text_accuracy": [
+        0.49666666666666665,
+        0.6416666666666667,
+        0.6283333333333333,
+        0.7,
+        0.6533333333333333,
+        0.6666666666666666,
+        0.6966666666666667,
+        0.6866666666666666
+      ],
+      "round_full_text_diversity": [
+        0.8,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "round_forced_missing_text_diversity": [
+        0.8,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "client_mean_uncertainty": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "aggregation_weights": [
+        [
+          0.26916666666666667,
+          0.16875,
+          0.01125,
+          0.06583333333333333,
+          0.485
+        ],
+        [
+          0.26916666666666667,
+          0.16875,
+          0.01125,
+          0.06583333333333333,
+          0.485
+        ],
+        [
+          0.26916666666666667,
+          0.16875,
+          0.01125,
+          0.06583333333333333,
+          0.485
+        ],
+        [
+          0.26916666666666667,
+          0.16875,
+          0.01125,
+          0.06583333333333333,
+          0.485
+        ],
+        [
+          0.26916666666666667,
+          0.16875,
+          0.01125,
+          0.06583333333333333,
+          0.485
+        ],
+        [
+          0.26916666666666667,
+          0.16875,
+          0.01125,
+          0.06583333333333333,
+          0.485
+        ],
+        [
+          0.26916666666666667,
+          0.16875,
+          0.01125,
+          0.06583333333333333,
+          0.485
+        ],
+        [
+          0.26916666666666667,
+          0.16875,
+          0.01125,
+          0.06583333333333333,
+          0.485
+        ]
+      ],
+      "fin_aggregation_weights": [
+        [
+          0.29164785553047406,
+          0.18284424379232508,
+          0.0,
+          0.0,
+          0.5255079006772009
+        ],
+        [
+          0.29164785553047406,
+          0.18284424379232508,
+          0.0,
+          0.0,
+          0.5255079006772009
+        ],
+        [
+          0.29164785553047406,
+          0.18284424379232508,
+          0.0,
+          0.0,
+          0.5255079006772009
+        ],
+        [
+          0.29164785553047406,
+          0.18284424379232508,
+          0.0,
+          0.0,
+          0.5255079006772009
+        ],
+        [
+          0.29164785553047406,
+          0.18284424379232508,
+          0.0,
+          0.0,
+          0.5255079006772009
+        ],
+        [
+          0.29164785553047406,
+          0.18284424379232508,
+          0.0,
+          0.0,
+          0.5255079006772009
+        ],
+        [
+          0.29164785553047406,
+          0.18284424379232508,
+          0.0,
+          0.0,
+          0.5255079006772009
+        ],
+        [
+          0.29164785553047406,
+          0.18284424379232508,
+          0.0,
+          0.0,
+          0.5255079006772009
+        ]
+      ],
+      "round_seconds": [
+        45.81946280505508,
+        43.83197461441159,
+        42.85509647894651,
+        42.698055570945144,
+        42.85888081043959,
+        43.912748051807284,
+        43.997094188816845,
+        42.937154716812074
+      ],
+      "round_peak_mib": [
+        4846.0107421875,
+        4846.0107421875,
+        4846.0107421875,
+        4846.0107421875,
+        4846.0107421875,
+        4846.0107421875,
+        4846.0107421875,
+        4846.0107421875
+      ]
+    },
+    "alpha": 0.1,
+    "num_clients": 5,
+    "nominal_clients": 5,
+    "active_clients": 5,
+    "skipped_client_ids": [],
+    "rounds": 8,
+    "local_epochs": 3,
+    "seed": 0,
+    "feature_dim": 256,
+    "beta": null,
+    "rho": null,
+    "temperature": null,
+    "fin_loss_weight": 1.0,
+    "trainable_params": 153278469,
+    "total_params": 153734927,
+    "upload_bytes_per_client_per_round": 613113876,
+    "uq_scalar_bytes": 0,
+    "total_comm_bytes": 49049110080,
+    "wall_seconds": 348.9104672372341,
+    "peak_mib": 4846.0107421875,
+    "peak_gpu_allocated_mib": 4846.0107421875,
+    "measurement_scope": "sequential local training, client uncertainty scan, aggregation, and peak allocated GPU memory; validation and process CPU RSS excluded"
+  }
+}

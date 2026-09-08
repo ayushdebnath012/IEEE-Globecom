@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 
+EXPECTED_DATA_PROTOCOL = "controlled_v2_real4_synthetic_covid_template_text"
 EXPECTED_BASE = "ce473f4bca58f8920d7c22b55b3e0dd28a2de227049f4ad77141659468cbf227"
 EXPECTED_CACHE = "4286565db7ff817f6cca0894479b7c1f8836fa73aa09407fd906634dbb0969ba"
 EXPECTED_CORE_RUNNER = "1805c5bafb5f4889ecab87fe16e3e16788d5e0d1c7d205f19c88f81555f420e4"
@@ -727,7 +728,7 @@ def _validate_new_protocol(payload: Mapping[str, Any], spec: Mapping[str, Any], 
         "learning_rate": 1e-4,
         "precision": "FP32",
         "initialization": expected_initialization,
-        "data": "controlled_v2_real4_synthetic_covid_template_text",
+        "data": EXPECTED_DATA_PROTOCOL,
     }
     for field, expected in expected_values.items():
         _equal(protocol.get(field), expected, f"{where}.protocol.{field}")
@@ -820,7 +821,7 @@ def _legacy_meta(legacy: Mapping[str, Any]) -> dict:
         "gpu": "NVIDIA H100 NVL",
         "n_train": N_TRAIN,
         "n_val": 600,
-        "data_protocol": "controlled_v2_real4_synthetic_covid_template_text",
+        "data_protocol": EXPECTED_DATA_PROTOCOL,
         "fl_initialization": "public_pretrained_encoders_random_task_heads",
         "training_precision": "fp32_tensors_no_amp",
         "runtime_environment": "shared_gpu_server_with_uncontrolled_contention",

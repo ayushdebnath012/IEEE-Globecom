@@ -1,0 +1,214 @@
+# Overleaf patch list
+
+Your Overleaf project and my local copy have DIVERGED. Do not paste my whole
+`Globecom_final_v2.tex` over yours -- your version has things mine does not:
+
+  * 37 references; mine has 21 (yours adds [22]-[37])
+  * a four-bullet Contribution list; mine has three
+  * "a crucial void of: secure fusion" in the abstract; mine drops the colon
+  * extra clauses in II-B and II-C citing [22]-[37]
+
+`results_corrected.tex` is ALREADY correct in Overleaf -- Fig. 3 compiled small
+with the short caption. Everything below is for the MAIN file only.
+
+--------------------------------------------------------------------------
+STEP 0.  Upload two images into the `generated/` folder in Overleaf
+--------------------------------------------------------------------------
+  generated/fig1b_omnimed_academic_architecture.png
+  generated/icon_hospital_client.png
+
+Without both, Step 2 will not compile.
+
+--------------------------------------------------------------------------
+STEP 1.  Preamble -- make sure these three lines exist
+--------------------------------------------------------------------------
+Adding a duplicate is harmless; a missing one breaks Step 2.
+
+\usetikzlibrary{arrows.meta,shapes.geometric,positioning,fit,backgrounds,calc}
+\definecolor{fignavy}   {RGB}{1,41,84}
+\graphicspath{{generated/}}
+
+The `fit` and `backgrounds` libraries are what draw the client box, `fignavy`
+colors the boundary and the "Server" label, `graphicspath` finds the PNGs.
+
+--------------------------------------------------------------------------
+STEP 2.  Figure 1 -- replace the ENTIRE figure environment
+--------------------------------------------------------------------------
+Delete your current Fig. 1 (the one captioned "OmniMed-FL architecture.
+DistilBERT and ViT-Base/16 encode the two proxy modalities; ...") from its
+\begin{figure} to its \end{figure}, and paste this in its place. Note it is a
+figure* (two-column), not a figure.
+
+\begin{figure*}[t]
+\centering
+\begin{minipage}[t]{0.485\textwidth}
+\centering
+\begin{tikzpicture}
+  \node[inner sep=0pt, anchor=south west] (pa)
+        {\includegraphics[width=\linewidth]
+                         {generated/fig1b_omnimed_academic_architecture.png}};
+  % Coordinates below are fractions of the bitmap: (0,0) lower left, (1,1) upper
+  % right. The boundary encloses everything computed at one hospital and is
+  % notched around the FedAvg cloud and the peer clients it serves.
+  \begin{scope}[x={(pa.south east)}, y={(pa.north west)}]
+    \draw[dashed, semithick, rounded corners=2pt, draw=fignavy]
+      (0.008,0.968) -- (0.625,0.968) -- (0.625,0.303) -- (0.992,0.303) --
+      (0.992,0.045) -- (0.008,0.045) -- cycle;
+    \coordinate (pabadge) at (0.075,0.968);
+    % "Server" in the free upper lobe of the FedAvg cloud, matched to the
+    % bitmap's own sans-serif navy lettering.
+    \node[inner sep=0pt, text=fignavy,
+          font=\sffamily\bfseries\fontsize{5.5}{6}\selectfont]
+          at (0.822,0.653) {Server};
+  \end{scope}
+  \node[anchor=west, fill=white, inner xsep=2pt, inner ysep=0.5pt,
+        font=\scriptsize\bfseries, text=fignavy]
+        at (pabadge) {Hospital Client $k$ (local computation)};
+  \node[fill=white, inner sep=1pt, anchor=east] at (pabadge)
+        {\includegraphics[height=0.36cm]{generated/icon_hospital_client.png}};
+\end{tikzpicture}
+\par\vspace{1pt}\textbf{(a)}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.485\textwidth}
+\centering
+\resizebox{0.98\linewidth}{!}{%
+\begin{tikzpicture}[node distance=0.45cm]
+  \node[llmbox] (ti)  {Text Input\\[-1pt]{\scriptsize Template clinical-style note}};
+  \node[sbox, below=0.28cm of ti] (tok) {Tokenizer\\WordPiece};
+  \node[llmbox, below=0.28cm of tok, text width=2.8cm, minimum height=1.0cm]
+        (llm) {Text Encoder\\[-2pt]{\scriptsize DistilBERT}};
+  \node[font=\scriptsize, below=0.18cm of llm] (ht)
+        {$\mathbf{h}_t\!\in\!\mathbb{R}^{256}$};
+
+  \node[vitbox, right=3.4cm of ti] (ii) {Image Input\\[-1pt]
+                                         {\scriptsize Chest X-ray $224{\times}224$}};
+  \node[sbox, below=0.28cm of ii] (aug) {Resize\\Normalize};
+  \node[vitbox, below=0.28cm of aug, text width=2.8cm, minimum height=1.0cm]
+        (vit) {Image Encoder\\[-2pt]{\scriptsize ViT-Base/16}};
+  \node[font=\scriptsize, below=0.18cm of vit] (hv)
+        {$\mathbf{h}_v\!\in\!\mathbb{R}^{512}$};
+
+  \node[fedbox, right=1.5cm of vit, yshift=0.3cm, minimum height=1.4cm,
+        text width=2.0cm] (fed)
+        {Aggregation Server\\[-2pt]\textbf{FedAvg}\\[-1pt]
+         {\scriptsize $K{=}3$--20 clients\\$T{=}8$ rounds}};
+
+  \node[vlmbox, below=1.0cm of llm, xshift=3.1cm, minimum height=0.95cm]
+        (vlm) {Multimodal Fusion\\[-2pt]
+               {\scriptsize Concat $|$ Cross-Attn $|$ Gated $|$ Dual-Proj $|$
+               Decoder A/B $|$ Cross-Attn-384 $|$ Token Encoder}};
+
+  \node[mainbox=3.2cm, fill=vlmred!40, draw=vlmred,
+        below=0.35cm of vlm] (cls)
+        {Classification Head (5-class)\\[-1pt]
+         {\scriptsize Focal + entropy/confidence penalties}};
+
+  \node[outbox, below=0.35cm of cls] (out)
+        {Normal $|$ Pneumonia $|$ COVID-19\\[-2pt]
+         {\scriptsize Pleural Effusion $|$ Cardiomegaly}};
+
+  \begin{scope}[on background layer]
+    \node[draw=llmblue!80!black, fill=llmblue!4, rounded corners=6pt,
+          dashed, thick, fit=(ti)(tok)(llm)(ht)(ii)(aug)(vit)(hv)(vlm)(cls)(out),
+          inner sep=7pt] (client) {};
+  \end{scope}
+  \node[anchor=south west, fill=white, inner xsep=3pt, inner ysep=1pt,
+        font=\scriptsize\bfseries, text=llmblue!80!black]
+        (clientlbl) at ([xshift=1.05cm]client.north west)
+        {Hospital Client $k$ (local computation)};
+  \node[fill=white, inner sep=1pt, anchor=east] at ([xshift=-1pt]clientlbl.west)
+        {\includegraphics[height=0.70cm]{generated/icon_hospital_client.png}};
+
+  \draw[arr](ti)--(tok);\draw[arr](tok)--(llm);\draw[arr](ii)--(aug);
+  \draw[arr](aug)--(vit);\draw[arr](llm)--(ht);\draw[arr](vit)--(hv);
+  \draw[arr](ht.south)--++(0,-0.15)-|(vlm.north west);
+  \draw[darr](hv.south)--++(0,-0.15)-|(vlm.north east);
+  \draw[arr](vlm)--(cls);\draw[arr](cls)--(out);
+  \draw[<->, >=Stealth, thick, dashed]
+        (client.east |- fed.center)--node[above, font=\scriptsize]{model updates}(fed.west);
+\end{tikzpicture}%
+}
+\par\vspace{1pt}\textbf{(b)}
+\end{minipage}
+\caption{OmniMed-FL architecture. (a) Overall multimodal federated workflow at the
+reference $K{=}5$ setting; the dashed boundary encloses what runs inside a single
+hospital client, and only model updates cross it to the FedAvg cloud shared by the
+other clients. (b) Detailed architecture with the same client-side computation
+boxed separately from the FedAvg aggregation server.}
+\label{fig:arch}
+\end{figure*}
+
+--------------------------------------------------------------------------
+STEP 3.  II-B Federated Clinical Learning -- replace the paragraph
+--------------------------------------------------------------------------
+KEEP YOUR CITATION CLAUSE. Your version has a sentence mine does not, ending
+"...foundation models, and hardened privacy~\cite{...}". Paste the block below,
+then re-attach that clause where marked.
+
+\subsection{Federated Clinical Learning}
+Privacy regulation moved the clinical community toward FL. FedAvg established
+decentralized training~\cite{McMahan2017}, and later work added multi-institutional
+collaboration without shared patient records~\cite{Sheller2020}, multinational
+COVID-19 CT validation~\cite{Dou2021}, and privacy-enhanced image
+learning~\cite{Kaissis2021}. FedProx and SCAFFOLD address the client heterogeneity
+that degrades naive averaging~\cite{Li2020fedprox,Karimireddy2020}. All of them train
+across distributed hospitals on one modality, so how they behave once a second
+modality is added is still open. We use them as the optimization backbone and test
+exactly that.
+
+  -> After "naive averaging~\cite{Li2020fedprox,Karimireddy2020}." insert your
+     existing clause, changing the period to a comma:
+     ", and clinical variants add prompt aggregation, split hybrids,
+     architecture search, personalization, label-scarce transfer, distillation,
+     foundation models, and hardened privacy~\cite{YOUR EXISTING KEYS}."
+
+--------------------------------------------------------------------------
+STEP 4.  II-C Vision-Language Models in Healthcare -- replace the paragraph
+--------------------------------------------------------------------------
+Same caution. Your version ends the FedMME/P-FIN sentence with "and federated
+clinical VLMs are only now appearing~\cite{...}" citing [24], [27], [34].
+
+\subsection{Vision--Language Models in Healthcare}
+Centralized vision--language models advanced in parallel. BiomedCLIP, LLaVA-Med, and
+MedCLIP learn from a radiograph and its report together and show that the pair
+teaches more than the image
+alone~\cite{Zhang2023biomedclip,Li2023llavamed,Wang2022medclip}, but they train on
+pooled corpora that no single hospital can assemble. Multimodal federated learning is
+more recent. FedMME combines one-shot client models by voting, and P-FIN fills in
+missing features with calibrated
+uncertainty~\cite{Wang2025fedmme,Shahid2026pfin}, each on its own data and budget.
+Neither line reports how much bandwidth and memory a multimodal federated model
+costs. We measure that cost, and we keep the data, encoders, optimizer, and client
+
+  -> After "each on its own data and budget" insert:
+     ", while federated clinical VLMs are only now appearing~\cite{YOUR KEYS}"
+
+--------------------------------------------------------------------------
+STEP 5.  Synthesis paragraph -- replace
+--------------------------------------------------------------------------
+part we varied.
+
+\textit{Synthesis.} Scores quoted from different papers are not comparable, so we
+rebuild FedMME- and P-FIN-style arms inside our own loop on the same data, encoders,
+and budget. Two findings follow that a cross-paper table would hide. Four times the
+local training moves the one-shot arm from 0.537 to 0.472, still short of FedAvg at
+0.652, so its deficit belongs to aggregating once and not to a smaller budget. And
+
+--------------------------------------------------------------------------
+STEP 6.  III-A Architecture -- replace the fusion-operator sentence
+--------------------------------------------------------------------------
+Replace from "Eight lightweight operators then merge the two:" through
+"...and a two-token Transformer encoder." with the two-family version. The
+lines below start mid-paragraph, so match them against your own text.
+
+is projected to $\mathbf{h}_t\!\in\!\mathbb{R}^{256}$, and mean-pooled ViT tokens
+give $\mathbf{h}_v\!\in\!\mathbb{R}^{512}$. Eight lightweight operators then
+merge the two, and they fall into two families. Three keep the join
+cheap---projected concatenation, dual-projection concatenation, and gated residual
+fusion. Five spend attention on it---residual cross-attention, its non-residual
+384-dimensional variant, a one-layer decoder A, a distinct two-query/two-layer
+decoder B, and a two-token Transformer encoder. Some code keys still carry foundation-model names
+
+--------------------------------------------------------------------------
+After pasting, Recompile. Expect Fig. 1 to become a two-panel figure spanning
+both columns, with the dashed hospital-client boundary in both panels.

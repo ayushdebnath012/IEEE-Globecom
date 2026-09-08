@@ -139,14 +139,24 @@ def validate(data: dict) -> None:
     meta = data.get("_meta", {})
     if meta.get("n_train") != 2400 or meta.get("n_val") != 600:
         raise ValueError("unexpected train/validation sizes")
-    if meta.get("data_protocol") != "controlled_v2_real4_synthetic_covid_template_text":
-        raise ValueError("result store is not marked as the controlled-v2 protocol")
-    if meta.get("data_cache_sha256") != (
-            "4286565db7ff817f6cca0894479b7c1f8836fa73aa09407fd906634dbb0969ba"):
-        raise ValueError("unexpected controlled data-cache hash")
-    if meta.get("image_source_counts") != {
-            "public_radiographs": 2400, "synthetic_covid": 600}:
-        raise ValueError("unexpected image-source provenance")
+    protocol = meta.get("data_protocol")
+    if protocol == "controlled_v3_real5_template_text":
+        # Real-only images. Every class is a public radiograph, so no synthetic
+        # image count may appear and the cache hash is whatever that build
+        # produced -- it only has to be recorded.
+        if meta.get("image_source_counts") != {"public_radiographs": 3000}:
+            raise ValueError("v3 store must source all 3,000 images publicly")
+        if not meta.get("data_cache_sha256"):
+            raise ValueError("v3 store is missing its data-cache hash")
+    elif protocol == "controlled_v2_real4_synthetic_covid_template_text":
+        if meta.get("data_cache_sha256") != (
+                "4286565db7ff817f6cca0894479b7c1f8836fa73aa09407fd906634dbb0969ba"):
+            raise ValueError("unexpected controlled data-cache hash")
+        if meta.get("image_source_counts") != {
+                "public_radiographs": 2400, "synthetic_covid": 600}:
+            raise ValueError("unexpected image-source provenance")
+    else:
+        raise ValueError("result store is not marked as a known data protocol")
     if meta.get("text_source_counts") != {
             "synthetic_class_conditioned_templates": 3000}:
         raise ValueError("unexpected text-source provenance")

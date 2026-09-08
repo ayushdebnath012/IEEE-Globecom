@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "task": "heldout_tfidf_faiss_retrieval",
+  "key": "fit=train_only|index=train|query=validation|top_k=5",
+  "protocol": {
+    "fit_scope": "training notes only",
+    "index_scope": "2,400 training notes",
+    "query_scope": "600 validation notes transformed after fit",
+    "labels_used_for": "evaluation only",
+    "vectorizer": "TfidfVectorizer(max_features=4096)",
+    "normalization": "L2",
+    "search": "exact FAISS IndexFlatIP",
+    "similarity_sd_ddof": 0
+  },
+  "provenance": {
+    "data_cache_sha256": "82bc364d664a2d2124adb642c296e2e7d84ecf843f306e6287815690c2a4204a",
+    "runner_sha256": "53dd61d8beb164da6027e97b5e516954276e09bc63adfd4e02d2f617876d59da",
+    "numpy": "2.4.4",
+    "scikit_learn": "1.9.0",
+    "faiss": "1.15.0"
+  },
+  "result": {
+    "n_queries": 600,
+    "corpus_size": 2400,
+    "top_k": 5,
+    "per_condition": {
+      "NORMAL": {
+        "n": 100,
+        "top1_accuracy": 0.58,
+        "precision_at_k": 0.5100000000000001,
+        "mean_top1_similarity": 0.7271671044826508,
+        "std_top1_similarity": 0.09534423700062945
+      },
+      "PNEUMONIA": {
+        "n": 141,
+        "top1_accuracy": 0.5106382978723404,
+        "precision_at_k": 0.42127659574468085,
+        "mean_top1_similarity": 0.7142083666003343,
+        "std_top1_similarity": 0.08411972162071277
+      },
+      "COVID19": {
+        "n": 107,
+        "top1_accuracy": 0.6448598130841121,
+        "precision_at_k": 0.5607476635514018,
+        "mean_top1_similarity": 0.716168029286037,
+        "std_top1_similarity": 0.09476442049719967
+      },
+      "PLEURAL_EFFUSION": {
+        "n": 135,
+        "top1_accuracy": 0.4444444444444444,
+        "precision_at_k": 0.4325925925925926,
+        "mean_top1_similarity": 0.690204879089638,
+        "std_top1_similarity": 0.08182984192512105
+      },
+      "CARDIOMEGALY": {
+        "n": 117,
+        "top1_accuracy": 0.5213675213675214,
+        "precision_at_k": 0.41538461538461546,
+        "mean_top1_similarity": 0.6850823520595192,
+        "std_top1_similarity": 0.081487724060231
+      }
+    },
+    "condition_macro_top1_accuracy": 0.5402620153536837,
+    "condition_macro_precision_at_k": 0.46800029345465816,
+    "condition_macro_mean_top1_similarity": 0.7065661463036358,
+    "overall_top1_accuracy": 0.5402620153536837,
+    "overall_mean_top1_similarity": 0.7065661463036358,
+    "micro_top1_accuracy": 0.5333333333333333,
+    "micro_precision_at_k": 0.4623333333333334,
+    "micro_mean_top1_similarity": 0.7056372719009717
+  }
+}

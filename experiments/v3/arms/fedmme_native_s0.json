@@ -1,0 +1,68 @@
+{
+  "task": "fedmme",
+  "key": "fedmme_native|epochs=100|alpha=0.1|K=5|seed=0",
+  "parameters": {
+    "seed": 0,
+    "alpha": 0.1,
+    "clients": 5,
+    "fusion": null,
+    "init_mode": null,
+    "pfin_mode": null,
+    "deterministic": false
+  },
+  "protocol": {
+    "rounds": 1,
+    "local_epochs": 100,
+    "communication_schedule": "one upload per independently trained client model",
+    "batch_size": 16,
+    "learning_rate": 0.0001,
+    "precision": "FP32",
+    "initialization": "public encoders + random task heads",
+    "data": "controlled_v3_real5_template_text"
+  },
+  "provenance": {
+    "base_model_sha256": "ce473f4bca58f8920d7c22b55b3e0dd28a2de227049f4ad77141659468cbf227",
+    "core_runner_sha256": "344fe4a5bbcff880a362d36f72a39cd2a3cd25c608474953f81bf3dc044a8fe4",
+    "reviewer_runner_sha256": "91425bc59bc3ea20f19d3a67fb94b3fba4447bcda9fa2eef80a27058e8f48452",
+    "pfin_helper_sha256": "d95f2f41331fa6fe86fc2837a86148075ffbd5329db6b18b87e0cbd7c698a896",
+    "data_cache_sha256": "82bc364d664a2d2124adb642c296e2e7d84ecf843f306e6287815690c2a4204a",
+    "torch": "2.13.0+cu130",
+    "gpu": "NVIDIA H100 NVL",
+    "deterministic_algorithms_enforced": false
+  },
+  "result": {
+    "f1": 0.6869069748187827,
+    "accuracy": 0.675,
+    "diversity": 1.0,
+    "per_client_f1": [
+      0.4764029262878385,
+      0.2593709032578515,
+      0.07611336032388663,
+      0.3438141080659731,
+      0.3726595793640152
+    ],
+    "client_sizes": [
+      646,
+      405,
+      27,
+      158,
+      1164
+    ],
+    "local_epochs": 100,
+    "matched_budget_epochs": 24,
+    "budget": "native",
+    "ensemble": "equal hard plurality; mean-softmax tie break",
+    "upload_bytes_per_client": 615742484,
+    "total_comm_bytes_bidirectional": 6157424840,
+    "total_comm_bytes_upload_only": 3078712420,
+    "wall_seconds": 1328.0976415164769,
+    "per_client_seconds": [
+      352.34497376997024,
+      223.07826666999608,
+      17.013411423191428,
+      85.22392051201314,
+      650.437069141306
+    ],
+    "peak_mib": 4292.8154296875
+  }
+}

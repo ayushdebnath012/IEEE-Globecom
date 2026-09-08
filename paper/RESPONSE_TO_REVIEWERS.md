@@ -12,7 +12,9 @@ exact reproduction of prior methods.
 > than the version the reviewers saw, and the comparison table (original
 > Table IV), the "18 model variants" framing, the five-LLM/five-ViT encoder
 > sweep, the 99.1% centralized-retention claim, and the 0.89 retrieval-similarity
-> claim are gone. This is deliberate, and it is the reason Reviewer 2's summary
+> claim are gone as revised conclusions. Selected accepted-version pilot plots and
+> branch scores are retained only as explicitly labeled, non-pooled context. This is
+> deliberate, and it is the reason Reviewer 2's summary
 > and Reviewer 1's "state-of-the-art" concern no longer map onto the text. The
 > corrections are itemized immediately below; every remaining number in the
 > manuscript comes from the audited run set.
@@ -32,13 +34,13 @@ Reviewer 2's summary restates them in good faith.
    diagnosis" is therefore not a claim this paper can make.
 
 2. **"The multimodal approach significantly outperforms isolated
-   single-modality systems."** In the audited branch comparison the text-only
-   branch reaches 0.893 macro-F1 against 0.782 for multimodal concatenation,
-   while costing 2.3x less model state, 2.4x less wall time and 2.8x less peak
-   memory (Fig. 4(e)). The revision therefore states that this proxy corpus
-   does not support a blanket multimodal-superiority claim, and attributes the
-   text advantage to class-conditioned template shortcuts that the text encoder
-   can exploit directly. What the data do support is retained: at `$\alpha=0.1$`
+   single-modality systems."** In the branch comparison, multimodal
+   concatenation reaches 0.956 macro-F1 against 0.934 for text-only and 0.664
+   for image-only, while costing 2.3x the text-only model state, 3.1x the timed
+   rounds and 2.1x the peak memory (Fig. 9, right). The revision preserves this
+   modality ordering while treating the 0.022 gain over text-only as
+   configuration-specific rather than a blanket superiority claim. What the
+   data do support is retained: at `$\alpha=0.1$`
    every federated arm except SCAFFOLD--AdamW exceeds local-only training
    (0.310), which is a federated-versus-isolated result, not a
    multimodal-versus-unimodal one.
@@ -56,11 +58,12 @@ Reviewer 2's summary restates them in good faith.
   Robust Multimodal Federated Learning Framework for Clinical Diagnosis." The
   manuscript defines "robust" as empirical stress testing, not certified
   clinical robustness.
-- The paper is plot-led: four figures contain 14 visual panels (architecture,
-  two new six-panel reviewer composites, and corrected retrieval). All results
+- The paper is plot-led: nine figures distribute the architecture, audited result
+  panels, corrected retrieval, scalability audit, and six accepted-version pilot plots
+  beside their corresponding discussions. All results
   tables were removed; only the common simulation-parameter table remains.
-- Relevant validated earlier evidence is retained inside the new panels, while
-  withdrawn pre-audit figures and claims are not reused.
+- Accepted-version panels are visibly separated from the audited panels, are not
+  pooled with them, and do not support the revised conclusions.
 
 ## Table and figure renumbering
 
@@ -72,7 +75,7 @@ numbers no longer resolve:
 | --- | --- |
 | Table II (simulation parameters) | Table I, plus the new "Why these settings" paragraph |
 | Table IV (main results) | Fig. 2(a) and the quantitative sentences now closing the abstract |
-| Remaining result tables | The twelve panels of Fig. 2 and Fig. 4 |
+| Remaining result tables | The audited panels distributed across Figs. 2--9 |
 
 ## Reviewer 1
 
@@ -233,10 +236,11 @@ pooled checkpoint's round-1 head start does not survive to round 8.
 
 The new systems figure contains complete `$K\times\alpha$` heat maps for F1,
 synchronized round-section time, and peak allocated memory, together with
-formula-derived communication, one-run branch costs, and the realized
+formula-derived communication, branch costs, and the realized
 severe-skew allocation. The branch audit reports text/image/multimodal F1 of
-0.893/0.740/0.782, one-way model-state sizes of 0.248/0.324/0.573 GiB, timed-round totals of
-18.5/33.6/45.0 minutes, and peak memory of 1.69/3.18/4.77 GiB.
+0.934/0.664/0.956, one-way model-state sizes of 0.248/0.324/0.573 GiB,
+timed-round totals of 1.8/4.3/5.6 minutes, and peak memory of
+2.84/4.33/5.92 GiB.
 
 Client activity is reported per cell as `$A/K$`, where a shard is active only if
 it holds at least four samples. Allocation is complete in every cell except

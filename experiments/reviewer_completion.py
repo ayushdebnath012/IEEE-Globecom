@@ -53,6 +53,13 @@ FUSION_TYPES = [
 ]
 
 
+# The corpus a record was computed on. Set OM_DATA_PROTOCOL when running
+# against a different cache -- a record must not claim a corpus it did not
+# use, which is exactly how the synthetic COVID class went unnoticed.
+DATA_PROTOCOL = os.environ.get(
+    "OM_DATA_PROTOCOL", "controlled_v2_real4_synthetic_covid_template_text")
+
+
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -533,7 +540,7 @@ def provenance(args, base: Path, cache: Path, result: dict) -> dict:
                 if args.task == "init" and args.init_mode == "random"
                 else "public encoders + random task heads"
             ),
-            "data": "controlled_v2_real4_synthetic_covid_template_text",
+            "data": DATA_PROTOCOL,
         },
         "provenance": {
             "base_model_sha256": sha256_file(base),
