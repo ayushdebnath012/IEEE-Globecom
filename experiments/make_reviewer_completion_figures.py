@@ -1299,7 +1299,7 @@ def _systems_figure(
                 f"branch_audit.publication_comparison[{audit_key!r}]",
             )
         score_source = (
-            "matched controlled-v3 branch audit, K=5, alpha=1, seed=0; "
+            "matched branch audit, K=5, alpha=1, seed=0; "
             "attention selected by the pooled fusion screen"
         )
     # astroid's ndarray stub omits keepdims, so pylint mis-flags this valid call.

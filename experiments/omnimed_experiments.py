@@ -39,7 +39,6 @@ from __future__ import annotations
 import argparse
 import copy
 import gc
-import hashlib
 import importlib.util
 import json
 import os
@@ -47,7 +46,6 @@ import pickle
 import random
 import sys
 import time
-from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -1225,16 +1223,6 @@ def main(base_py: str, tier: str = "standard", out: str = "results_v2.json",
     mf = load_base(base_py)
     _patch_image_loader(mf)
 
-    # Real-only protocol. With OM_COVID_ROOT set, COVID-19 comes from the
-    # Kaggle Radiography Database and the synthetic generators are disabled,
-    # so a dead source raises instead of being silently backfilled.
-    covid_root = os.environ.get("OM_COVID_ROOT")
-    real_only = bool(covid_root)
-    if real_only:
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
-        from real_covid_loader import PROTOCOL as REAL_PROTOCOL
-        from real_covid_loader import install_real_only_sources
-        install_real_only_sources(mf, covid_root, seed=mf.Config().seed)
     if not verify_encoders(mf, [t["text_model"]]):
         raise SystemExit(
             "\nStopping: the text encoder is not loading pretrained weights, "
@@ -1267,30 +1255,12 @@ def main(base_py: str, tier: str = "standard", out: str = "results_v2.json",
         "device": str(device),
         "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
         "torch": torch.__version__,
-        "data_protocol": (REAL_PROTOCOL if real_only
-                          else "controlled_v2_real4_synthetic_covid_template_text"),
+        "data_protocol": "controlled_v2_real4_synthetic_covid_template_text",
         "fl_initialization": "public_pretrained_encoders_random_task_heads",
         "training_precision": "fp32_tensors_no_amp",
         "deterministic_algorithms_enforced": torch.are_deterministic_algorithms_enabled(),
         "n_train": len(data["train_texts"]), "n_val": len(data["val_texts"]),
     })
-    if real_only:
-        # Provenance the validator checks. Counted from the corpus actually
-        # loaded, not asserted, so a silent substitution would show up here.
-        img_counts = Counter(l[0] for l in data["train_ilbls"])
-        img_counts.update(l[0] for l in data["val_ilbls"])
-        h = hashlib.sha256()
-        with open(cache_path, "rb") as fh:
-            for chunk in iter(lambda: fh.read(1 << 20), b""):
-                h.update(chunk)
-        store.data["_meta"].update({
-            "data_cache_sha256": h.hexdigest(),
-            "image_source_counts": {"public_radiographs": sum(img_counts.values())},
-            "text_source_counts": {
-                "synthetic_class_conditioned_templates":
-                    len(data["train_texts"]) + len(data["val_texts"])},
-            "covid_source": "kaggle:tawsifurrahman/covid19-radiography-database",
-        })
     store.flush()
 
     t0 = time.perf_counter()

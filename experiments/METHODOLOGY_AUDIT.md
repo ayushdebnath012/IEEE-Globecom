@@ -171,14 +171,11 @@ instead, pinning its parent and every runner by SHA-256:
 
 `legacy_sha256` is the same digest this document records for the validated
 artifact, so the audited set is the parent of the set the manuscript reports.
-&dagger; These two runners have advanced past the revision that produced this store.
-`omnimed_experiments.py` gained the real-only v3 image protocol and
-`reviewer_completion.py` the changes that accompany it, so both now hash
-differently from the digests recorded above. Neither edit is retroactive: the
-pinned revisions are the ones committed at `52d5bf2`, recovered with
-`git show 52d5bf2:experiments/omnimed_experiments.py`. Until a v3 merge records
-its own runner hashes, those two entries verify against that commit rather than
-against the working tree.
+&dagger; These two runners have advanced past the revision that produced this
+store, so both now hash differently from the digests recorded above. Neither
+edit is retroactive: the pinned revisions are the ones committed at `52d5bf2`,
+recovered with `git show 52d5bf2:experiments/omnimed_experiments.py`. Those two
+entries verify against that commit rather than against the working tree.
 
 Every hash above resolves to a file committed here -- the two marked &dagger; at
 `52d5bf2` rather than at the tip, and the superseded reviewer-runner revision

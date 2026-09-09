@@ -10,9 +10,9 @@ which is what the tokenizer produces for an empty string. It is not a zeroed
 tensor, so the encoder runs normally and the score is a real measurement rather
 than a masked-out NaN.
 
-    OM_COVID_ROOT=... ./.venv/bin/python repo/experiments/missing_text_audit.py \
+    ./.venv/bin/python repo/experiments/missing_text_audit.py \
         --base repo/source/MedFederate_Colab_Complete.py \
-        --cache data_cache_v3_real.pkl --out missing_text_v3.json
+        --cache data_cache_controlled_v2.pkl --out missing_text.json
 """
 
 from __future__ import annotations

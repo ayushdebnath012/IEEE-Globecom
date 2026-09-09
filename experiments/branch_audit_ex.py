@@ -7,9 +7,9 @@ Answers three questions the aggregate macro-F1 at alpha=1 cannot:
 * which classes each branch actually wins, since a macro average over five
   classes hides the ones where the radiograph carries the finding.
 
-    OM_COVID_ROOT=... ./.venv/bin/python repo/experiments/branch_audit_ex.py \
+    ./.venv/bin/python repo/experiments/branch_audit_ex.py \
         --base repo/source/MedFederate_Colab_Complete.py \
-        --cache data_cache_v3_real.pkl --alpha 0.1 --out branch_a01.json
+        --cache data_cache_controlled_v2.pkl --alpha 0.1 --out branch_a01.json
 """
 
 from __future__ import annotations
