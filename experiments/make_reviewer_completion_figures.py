@@ -1019,7 +1019,10 @@ def _save_panels(fig, axes, output: Path) -> None:
     for index, ax in enumerate(np.ravel(axes)):
         extent = ax.get_tightbbox().transformed(fig.dpi_scale_trans.inverted())
         target = output.with_name(f"{output.stem}_p{'abcdef'[index]}.png")
-        fig.savefig(target, dpi=350, bbox_inches=extent.expanded(1.06, 1.06))
+        # Keep enough horizontal padding for tick labels without reaching into
+        # the neighboring row (which can leak a clipped parenthesis into a
+        # standalone panel).
+        fig.savefig(target, dpi=350, bbox_inches=extent.expanded(1.06, 1.01))
         print(f"wrote {target}")
 
 
@@ -1070,7 +1073,11 @@ def _annotated_heatmap(
     inset.tick_params(labelsize=4.5, width=0.4, length=1.5)
 
 
-def _systems_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
+def _systems_figure(
+    data: Mapping[str, Any],
+    output: Path,
+    branch_audit: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     echo: dict[str, Any] = {}
     fig, axes = plt.subplots(2, 3, figsize=(7.25, 3.32), layout="constrained")
 
@@ -1249,27 +1256,52 @@ def _systems_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
         for clients, summary in zip(CLIENTS, communication_summaries)
     }
 
-    # (e) Modality-branch resource audit.  Colors are normalized within each
-    # row because the three measures have different physical units; annotations
-    # remain absolute.
+    # (e) Modality-branch resource audit. Colors are normalized within each
+    # row because the measures have different physical units; annotations
+    # remain absolute. All four rows come from the selected publication store.
     branch_keys = ("Fed-LLM", "Fed-ViT", "Fed-VLM")
-    branch_labels = ("Text only", "Image only", "Multimodal\nconcat")
-    # Macro-F1 values from the study's original K=5, alpha=1 branch comparison.
-    # Resource rows remain the directly measured per-branch quantities below.
-    study_branch_f1 = {
-        "Fed-LLM": 0.934,
-        "Fed-ViT": 0.664,
-        "Fed-VLM": 0.956,
-    }
-    reviewer_branch_cost = {
-        "Fed-LLM": (0.248, 1.8, 2.84),
-        "Fed-ViT": (0.324, 4.3, 4.33),
-        "Fed-VLM": (0.573, 5.6, 5.92),
-    }
+    branch_labels = (
+        "Text only",
+        "Image only",
+        "Multimodal\nattention" if branch_audit is not None else "Multimodal\nconcat",
+    )
     cost_values = np.zeros((4, 3), dtype=float)
     for column, branch in enumerate(branch_keys):
-        cost_values[0, column] = study_branch_f1[branch]
-        cost_values[1:, column] = reviewer_branch_cost[branch]
+        record = _record(data, "legacy_branch_cost", branch)
+        cost_values[:, column] = (
+            _number(record, "f1", f"legacy_branch_cost[{branch!r}]") ,
+            _number(record, "upload_bytes_per_client_per_round",
+                    f"legacy_branch_cost[{branch!r}]") / (1024 ** 3),
+            _number(record, "wall_seconds",
+                    f"legacy_branch_cost[{branch!r}]") / 60.0,
+            _number(record, "peak_mib",
+                    f"legacy_branch_cost[{branch!r}]") / 1024.0,
+        )
+    score_source = "selected publication store, K=5, alpha=1"
+    if branch_audit is not None:
+        comparison = _mapping(
+            branch_audit.get("publication_comparison"),
+            "branch_audit.publication_comparison",
+        )
+        score_rows = (
+            ("text_only", "text_only"),
+            ("image_only", "image_only"),
+            ("multimodal_attention", "multimodal_attention"),
+        )
+        for column, (_, audit_key) in enumerate(score_rows):
+            audit_record = _mapping(
+                comparison.get(audit_key),
+                f"branch_audit.publication_comparison[{audit_key!r}]",
+            )
+            cost_values[0, column] = _number(
+                audit_record,
+                "macro_f1",
+                f"branch_audit.publication_comparison[{audit_key!r}]",
+            )
+        score_source = (
+            "matched controlled-v3 branch audit, K=5, alpha=1, seed=0; "
+            "attention selected by the pooled fusion screen"
+        )
     # astroid's ndarray stub omits keepdims, so pylint mis-flags this valid call.
     row_max = np.maximum(cost_values.max(axis=1, keepdims=True), np.finfo(float).eps)  # pylint: disable=unexpected-keyword-arg
     normalized = cost_values / row_max
@@ -1307,7 +1339,7 @@ def _systems_figure(data: Mapping[str, Any], output: Path) -> dict[str, Any]:
             "shared_server_wall_minutes": float(cost_values[2, index]),
             "peak_gpu_gib": float(cost_values[3, index]),
             "n": 1,
-            "score_source": "original K=5, alpha=1 modality comparison",
+            "score_source": score_source,
             "cost_source": "reviewer-requested resource audit",
         }
         for index, (branch, label) in enumerate(zip(branch_keys, branch_labels))
@@ -1365,6 +1397,15 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="output directory (default: <paper-root>/generated)",
     )
+    parser.add_argument(
+        "--branch-audit",
+        type=Path,
+        default=None,
+        help=(
+            "optional matched branch-audit JSON whose seed-0 text, image, and "
+            "attention scores replace only the modality-score row"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -1386,7 +1427,17 @@ def main() -> None:
     matched_path = out_dir / "reviewer_matched_results.png"
     systems_path = out_dir / "reviewer_systems_scalability.png"
     matched_echo = _matched_figure(data, matched_path)
-    systems_echo = _systems_figure(data, systems_path)
+    branch_audit = None
+    if args.branch_audit is not None:
+        if not args.branch_audit.is_file():
+            raise FileNotFoundError(
+                f"branch audit file not found: {args.branch_audit}"
+            )
+        branch_audit = _mapping(
+            json.loads(args.branch_audit.read_text(encoding="utf8")),
+            "branch_audit",
+        )
+    systems_echo = _systems_figure(data, systems_path, branch_audit)
 
     print("PLOTTED_VALUES_BEGIN")
     print(

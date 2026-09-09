@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "task": "matched_modality_branch_audit",
+  "protocol": {
+    "data_protocol": "controlled_v3_real5_template_text",
+    "public_radiographs": 3000,
+    "synthetic_notes": 3000,
+    "alpha": 1.0,
+    "clients": 5,
+    "rounds": 8,
+    "local_epochs": 3,
+    "training_precision": "fp32_tensors_no_amp",
+    "gpu": "NVIDIA H100 NVL",
+    "torch": "2.13.0+cu130",
+    "multimodal_fusion": "attention"
+  },
+  "provenance": {
+    "data_cache_sha256": "82bc364d664a2d2124adb642c296e2e7d84ecf843f306e6287815690c2a4204a",
+    "core_runner_sha256": "3ca89175f6394984f26933280312772819d69c81d7feb03013ff22100ce8ff0b",
+    "branch_runner_sha256": "b050dc241010fe3dd19d55bdad3934b663469e0d69aebedaa41576185794273c",
+    "base_model_sha256": "ce473f4bca58f8920d7c22b55b3e0dd28a2de227049f4ad77141659468cbf227",
+    "seed_0_branch_record_sha256": "a550c984f705defd85a9e5925dd35ad1f554901c170877b6d0208d82bcbb0994",
+    "seed_0_attention_record_sha256": "63ba93223429b9d1311e2c327be407c1d4472194ec118fa232b0a70f3bced2af",
+    "seed_1_attention_record_sha256": "43e17ace05a3adc448e0184b82d401c99c91375f35d9f096c265f4e3a0a2ef8d",
+    "seed_1_e6_record_sha256": "d0864e23f0f63115114d7fbb96c513dcf2f5ed81e783244e55f7a02505558504",
+    "selection_note": "Residual cross-attention was selected by the pooled E5 fusion screen before the matched federated branch audit."
+  },
+  "publication_comparison": {
+    "scope": "matched single-seed federated branch audit",
+    "seed": 0,
+    "text_only": {
+      "macro_f1": 0.880246506145629,
+      "per_class_f1": {
+        "Normal": 0.8901,
+        "Pneumonia": 0.8968,
+        "COVID-19": 0.8727,
+        "Pleural Effusion": 0.8613,
+        "Cardiomegaly": 0.8803
+      }
+    },
+    "image_only": {
+      "macro_f1": 0.7368662494435692,
+      "per_class_f1": {
+        "Normal": 0.7143,
+        "Pneumonia": 0.6325,
+        "COVID-19": 0.9273,
+        "Pleural Effusion": 0.7216,
+        "Cardiomegaly": 0.6886
+      }
+    },
+    "multimodal_attention": {
+      "macro_f1": 0.9059089145731875,
+      "per_class_f1": {
+        "Normal": 0.8744,
+        "Pneumonia": 0.9112,
+        "COVID-19": 0.9668,
+        "Pleural Effusion": 0.8936,
+        "Cardiomegaly": 0.8835
+      }
+    }
+  },
+  "replication_seed_1": {
+    "scope": "same protocol; text/image from the seed-1 E6 record and attention from the seed-1 branch audit",
+    "seed": 1,
+    "text_only_macro_f1": 0.880246506145629,
+    "image_only_macro_f1": 0.7527478743210556,
+    "multimodal_attention_macro_f1": 0.7896076858648703
+  }
+}

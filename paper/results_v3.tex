@@ -1,0 +1,259 @@
+\section{Results}
+\label{sec:results}
+
+All quantitative results in this section come from the frozen
+\texttt{controlled\_v3\_real5\_template\_text} run and its provenance-checked
+merge. Scores are validation macro-F1. Error bars are sample standard
+deviations over seeds 0 and 1 unless a single-run diagnostic is identified.
+
+\subsection{Matched Baselines under Label Skew}
+
+At $\alpha{=}0.1$ and $K{=}5$, local-only training averages 0.297 across the
+five clients of one partition. Under the same corpus, partition, encoders,
+optimizer, and 24-local-epoch budget, FedAvg reaches
+$0.662\!\pm\!0.074$ and FedProx $0.737\!\pm\!0.085$
+(Fig.~\ref{fig:baseline}). Their 0.075 gap lies inside the wider sample
+standard deviation, so two seeds do not separate them. At $\alpha{=}1$, the
+same ordering is 0.523 local-only, $0.820\!\pm\!0.029$ FedAvg, and
+$0.862\!\pm\!0.019$ FedProx. Thus, both iterative federated methods sit well
+above isolated client training at both skews.
+
+Our SCAFFOLD--AdamW adaptation reaches only $0.070\!\pm\!0.015$ at
+$\alpha{=}0.1$ and $0.236\!\pm\!0.205$ at $\alpha{=}1$. Its oscillatory
+trajectory points to an unstable AdamW control-variate adaptation; this row
+must not be read as a faithful evaluation of classical SGD-based SCAFFOLD.
+The FedMME-style one-shot ensemble reaches $0.647\!\pm\!0.080$ at the matched
+24-epoch budget and $0.609\!\pm\!0.109$ at its native 100-epoch budget.
+Increasing local computation does not repair one-shot aggregation under
+severe skew.
+
+\begin{figure}[!t]
+\centering
+\begin{minipage}[t]{0.465\columnwidth}\centering
+\includegraphics[width=\linewidth]{reviewer_matched_results_pa}\\[-5pt]
+{\scriptsize\textbf{(a)}}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.465\columnwidth}\centering
+\includegraphics[width=\linewidth]{reviewer_matched_results_pb}\\[-5pt]
+{\scriptsize\textbf{(b)}}
+\end{minipage}
+\caption{Controlled-v3 results at $\alpha{=}0.1$, $K{=}5$:
+(a) matched baselines and (b) federated convergence.}
+\label{fig:baseline}
+\end{figure}
+
+\subsection{Anti-Collapse, Fusion, and Initialization}
+
+The anti-collapse ablation reverses the intended low-$\alpha$ ordering.
+With the balanced sampler and entropy-diversity term, F1 is
+$0.683\!\pm\!0.089$. Removing the sampler, the diversity term, or both raises
+the mean monotonically to $0.716\!\pm\!0.055$,
+$0.726\!\pm\!0.035$, and $0.758\!\pm\!0.016$
+(Fig.~\ref{fig:anti_missing}(a)). Every one of the eight $\alpha{=}0.1$ runs
+finishes at five-class diversity 1.0, including both unregularized seeds, so
+final collapse is not observed. The full stack improves the mean minimum
+diversity across rounds from 0.70 to 0.90, but it does so with a 0.075 F1
+deficit to the unregularized configuration. At $\alpha{=}1$, all four
+configurations maintain diversity 1.0 and score 0.809--0.846. We therefore
+treat the stack as a transient coverage guard, not an accuracy-improving
+component. Likewise, the non-federated early-abort controls score
+$0.899\!\pm\!0.022$ with abort disabled and $0.871\!\pm\!0.012$ with it
+enabled; neither branch collapses.
+
+\begin{figure}[!t]
+\centering
+\begin{minipage}[t]{0.435\columnwidth}\centering
+\includegraphics[width=\linewidth]{reviewer_matched_results_pc}\\[-5pt]
+{\scriptsize\textbf{(a)}}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.505\columnwidth}\centering
+\includegraphics[width=\linewidth]{reviewer_matched_results_pf}\\[-5pt]
+{\scriptsize\textbf{(b)}}
+\end{minipage}
+\caption{Controlled-v3 ablations: (a) anti-collapse F1 and minimum
+predicted-class diversity; (b) forced-missing-text performance.}
+\label{fig:anti_missing}
+\end{figure}
+
+The pooled-data fusion screen is a diagnostic architecture comparison, not an
+operational FL result. Across two seeds, its eight operators span 0.750--0.925
+F1. The 0.1755 spread is 33 times the 0.0053 median seed standard deviation,
+so fusion choice carries real signal in this screen. Residual cross-attention
+leads at $0.925\!\pm\!0.001$, while 384-dimensional cross-attention is last at
+$0.750\!\pm\!0.002$; with only two seeds, the closely grouped leading methods
+remain descriptively rather than statistically ordered. In the separate
+operational sweep at $\alpha{=}0.1$, means span 0.636--0.759 but one operator's
+sample standard deviation reaches 0.167, so that severe-skew sweep does not
+resolve an operational winner (Fig.~\ref{fig:fusion_init}(a)).
+
+The initialization control in Fig.~\ref{fig:fusion_init}(b) closes at
+$0.647\!\pm\!0.022$ with all weights random and
+$0.831\!\pm\!0.001$ with public encoders and random task heads. A pooled-data
+checkpoint opens at 0.874 and closes at $0.877\!\pm\!0.007$, but it was
+selected on the reporting split and is a non-deployable diagnostic oracle.
+The operational public-encoder initialization retains 94.7\% of its final F1
+without accessing pooled training data.
+
+\begin{figure}[!t]
+\centering
+\begin{minipage}[t]{0.465\columnwidth}\centering
+\includegraphics[width=\linewidth]{reviewer_matched_results_pd}\\[-5pt]
+{\scriptsize\textbf{(a)}}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.465\columnwidth}\centering
+\includegraphics[width=\linewidth]{reviewer_matched_results_pe}\\[-5pt]
+{\scriptsize\textbf{(b)}}
+\end{minipage}
+\caption{Controlled-v3 comparisons: (a) operational federated fusion under
+severe skew; (b) federated initialization and non-federated abort controls.}
+\label{fig:fusion_init}
+\end{figure}
+
+Under the forced-missing-text metric in Fig.~\ref{fig:anti_missing}(b), zero
+filling, deterministic FIN, Gaussian $\beta$-NLL imputation, and
+uncertainty-weighted aggregation score $0.688\!\pm\!0.025$,
+$0.693\!\pm\!0.004$, $0.706\!\pm\!0.010$, and
+$0.706\!\pm\!0.089$. The uncertainty-weighted rule ties the plain
+probabilistic rule and is the noisiest, so this matched adaptation does not
+show that uncertainty weighting tightens performance.
+
+\subsection{Retrieval-Stage Evaluation}
+
+Exact inner-product FAISS search~\cite{Johnson2021faiss} over training-fitted
+TF--IDF note vectors gives condition-macro averages of 0.542 top-1 same-label
+accuracy, 0.470 precision@5, and 0.706 mean top-1 cosine similarity across all
+600 validation queries (Fig.~\ref{fig:retrieval}). Top-1 accuracy is above the
+0.2 label prior but well below the similarity score, consistent with
+synthetic templates whose neighbors can be lexically close without sharing a
+label. This is a retrieval-stage diagnostic and establishes no clinical
+generation quality.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.72\columnwidth]{fig_rag_validated}
+\caption{Controlled-v3 retrieval metrics by condition over 600 held-out
+queries and a 2,400-note index.}
+\label{fig:retrieval}
+\end{figure}
+
+\subsection{Scalability, Communication, and Resource Cost}
+
+Figure~\ref{fig:scale_accuracy}(a) crosses
+$K{=}\{3,5,10,20\}$ with $\alpha{=}\{0.1,1,5\}$. Every
+$\alpha{=}5$ cell lies in 0.849--0.916 and every $\alpha{=}1$ cell in
+0.818--0.862, whereas $\alpha{=}0.1$ yields 0.643--0.738 with spreads up to
+$\pm0.159$. Within a row, increasing $K$ nearly sevenfold moves the mean by
+at most 0.10 F1, while changing skew moves it by as much as 0.27. Client count
+is therefore secondary to realized label allocation in this grid. Cells show
+$A/K$, where $A$ counts shards with at least four samples; the severe
+$K{=}20$ split has 17 active clients. Figure~\ref{fig:scale_accuracy}(b)
+shows one realized partition in which individual clients hold nearly entire
+classes.
+
+\begin{figure}[!t]
+\centering
+\begin{minipage}[t]{0.465\columnwidth}\centering
+\includegraphics[width=\linewidth]{reviewer_systems_scalability_pa}\\[-5pt]
+{\scriptsize\textbf{(a)}}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.465\columnwidth}\centering
+\includegraphics[width=\linewidth]{reviewer_systems_scalability_pf}\\[-5pt]
+{\scriptsize\textbf{(b)}}
+\end{minipage}
+\caption{Controlled-v3 scaling: (a) macro-F1 over client count and skew;
+(b) one severe-skew client allocation.}
+\label{fig:scale_accuracy}
+\end{figure}
+
+The GPU-synchronized sections in Fig.~\ref{fig:resources} take 41--62\,s per
+round and allocate 4.77--5.92\,GiB on the shared H100. These panels are
+execution records, not distributed-throughput curves: clients are simulated
+sequentially, and uncontrolled server contention remains.
+
+\begin{figure}[!b]
+\centering
+\begin{minipage}[t]{0.465\columnwidth}\centering
+\includegraphics[width=\linewidth]{reviewer_systems_scalability_pb}\\[-5pt]
+{\scriptsize\textbf{(a)}}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.465\columnwidth}\centering
+\includegraphics[width=\linewidth]{reviewer_systems_scalability_pc}\\[-5pt]
+{\scriptsize\textbf{(b)}}
+\end{minipage}
+\caption{Controlled-v3 resource measurements: (a) seconds per round and
+(b) peak allocated GPU memory.}
+\label{fig:resources}
+\end{figure}
+
+For $|\theta|$ trainable parameters, $b$ bytes per parameter, $T$ rounds, and
+nominal $K$, the plotted bidirectional volume is
+\begin{equation}
+V_{\mathrm{nom}}=2KT|\theta|b.
+\label{eq:comm}
+\end{equation}
+Here $|\theta|{=}153{,}935{,}621$, $b{=}4$, and $T{=}8$, giving
+27.5/45.9/91.8/183.5\,GiB at $K{=}3/5/10/20$. These are model-state
+calculations, not measured network traffic; serialization, compression,
+secure aggregation~\cite{Ergun2022globecom}, and algorithm-specific state are
+excluded.
+
+The matched single-seed branch audit at $\alpha{=}1$, $K{=}5$ scores text,
+image, and concatenated multimodal models at 0.880, 0.768, and 0.830
+(Fig.~\ref{fig:costs}(b)). Thus, concatenation improves on image-only by 0.062
+but trails text-only by 0.050 in this run. Its one-way FP32 state is 0.573\,GiB
+versus 0.248/0.324\,GiB, total timed rounds take 5.6 versus 1.8/4.3 minutes,
+and peak allocation is 5.92 versus 2.84/4.33\,GiB. Fusion therefore incurs a
+clear systems cost without guaranteeing a gain over the stronger unimodal
+branch.
+
+\begin{figure}[!b]
+\centering
+\begin{minipage}[t]{0.465\columnwidth}\centering
+\includegraphics[width=\linewidth]{reviewer_systems_scalability_pd}\\[-5pt]
+{\scriptsize\textbf{(a)}}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.465\columnwidth}\centering
+\includegraphics[width=\linewidth]{reviewer_systems_scalability_pe}\\[-5pt]
+{\scriptsize\textbf{(b)}}
+\end{minipage}
+\caption{Controlled-v3 systems cost: (a) formula-derived FP32 model-state
+volume; (b) single-seed modality score and measured resource audit.}
+\label{fig:costs}
+\end{figure}
+
+\section{Discussion and Limitations}
+
+The v3 rerun supports the paper's systems thesis but narrows two model claims.
+Federation provides a large advantage over isolated local training, and
+partition skew dominates client count. Fusion architecture also matters in
+the pooled diagnostic screen. However, the operational concatenated model
+does not beat text-only in the matched branch audit, and the anti-collapse
+stack does not improve F1 under severe skew. We retain both negative findings
+rather than overstate claims contradicted by v3.
+
+The corpus remains a proxy: notes are synthetic and class-paired, not
+patient-paired; template wording can leak class information; image class is
+partly confounded with source collection; and the split is grouped by neither
+patient nor source. Two seeds permit descriptive spreads, not significance,
+and deterministic CUDA algorithms were not forced. Sequential single-GPU
+simulation omits concurrency, latency, stragglers, dropout, and heterogeneous
+hardware. Communication is analytic model-state volume rather than measured
+network traffic. FedMME, P-FIN, and SCAFFOLD rows are declared adaptations,
+not native replications. Consequently, none of the F1 or retrieval values
+estimates clinical safety, generalization, or deployment readiness.
+
+\newpage
+\section{Conclusion}
+
+On 3,000 public radiographs with class-paired synthetic notes, matched
+controlled-v3 experiments show that FedAvg and FedProx outperform local-only
+training at both tested skews, while label skew changes F1 more than a
+near-sevenfold change in client count. Public encoders retain 94.7\% of a
+pooled diagnostic oracle without pooled operational training. The fusion
+screen shows genuine architecture sensitivity, but concatenation trails
+text-only in the matched federated branch audit and costs $2.3\times$ its
+model state. Removing both anti-collapse components improves severe-skew F1
+from 0.683 to 0.758, with all runs finishing at full predicted-class
+diversity. These findings define OmniMed-FL as a controlled systems benchmark
+and motivate patient-paired, multi-institutional validation with more seeds,
+native baseline implementations, and end-to-end network measurements.
